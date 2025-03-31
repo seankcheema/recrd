@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, ScrollView, TextInput, Image, StyleSheet, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import Nav from './Nav';
 import GlobalText from './GlobalText';
-import { Feather } from '@expo/vector-icons';
 
-export default function Home() {
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
-  };
-
+export default function List() {
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
     <View style={{ flex: 1, backgroundColor: '#111111' }}>
@@ -30,6 +23,14 @@ export default function Home() {
                 </View>
                 <View style={{ marginLeft: 10, backgroundColor: '#FFFAF0A0', height: 1, flex: 1 }} />
             </View>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10}}>
+                    <Image source={require('@/assets/images/placeholder_album.png')} style={{width: 60, height: 60}}/>
+                    <View>
+                        <GlobalText style={{fontSize: 16, fontWeight:'bold'}}>Mr. Morale and the Big Steppers</GlobalText>
+                        <GlobalText style={{fontSize: 14, color: '#FFFAF0A0'}}>by Kendrick Lamar</GlobalText>
+                    </View>
+                </View>
 
             <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 10}}>
                 <View style={[styles.rankingTag, {backgroundColor: '#993B3B'}]}>
