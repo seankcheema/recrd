@@ -37,3 +37,6 @@ ios/.DS_Store
 .vscode/
 .idea/
 *.iml
+
+.env
+venv
