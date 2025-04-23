@@ -17,16 +17,16 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
       
       {/* List Screen */}
-      <Stack.Screen name="list" />
+      <Stack.Screen name="components/List" />
 
       {/* Add New Screen */}
-      <Stack.Screen name="add-new" />
+      <Stack.Screen name="components/AddNew" />
 
       {/* Trending Screen */}
-      <Stack.Screen name="trending" />
+      <Stack.Screen name="components/Trending" />
 
       {/* Profile Screen */}
-      <Stack.Screen name="profile" />
+      <Stack.Screen name="components/Profile" />
     </Stack>
   );
 }

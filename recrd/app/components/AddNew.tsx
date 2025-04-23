@@ -13,35 +13,36 @@ export default function AddNew() {
 
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-    <View style={{ flex: 1, backgroundColor: '#111111' }}>
-      <View style={{ padding: 20 }}>
-        <GlobalText style={{ color: '#E7BC10', fontSize: 32, marginTop: 50, fontWeight: '800' }}>
-          recrd
-        </GlobalText>
+      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
+        <ScrollView style={{ padding: 20, paddingTop: 0 }}>
 
-        {/* Search Bar Component */}
-        <View style={styles.searchBarContainer}>
-          <Feather name="search" size={24} color="#FFFAF0" />
-          <TextInput
-            value={searchQuery}
-            onChangeText={handleSearchChange}
-            placeholder="search an album, artist, or friend"
-            placeholderTextColor="#FFFAF0A0"
-            style={styles.searchBar}
-            maxLength={25}
-          />
-        </View>
+          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
+            recrd
+          </GlobalText>
 
-        <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 20, fontWeight: '800' }}>
-          recent searches
-        </GlobalText>
+          {/* Search Bar Component */}
+          <View style={styles.searchBarContainer}>
+            <Feather name="search" size={24} color="#FFFAF0" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              placeholder="search an album, artist, or friend"
+              placeholderTextColor="#FFFAF0A0"
+              style={styles.searchBar}
+              maxLength={25}
+            />
+          </View>
 
-        <ScrollView>
-          {/* ScrollView content here */}
+          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 20, fontWeight: '800' }}>
+            recent searches
+          </GlobalText>
+
+          <ScrollView>
+            {/* ScrollView content here */}
+          </ScrollView>
         </ScrollView>
+        <Nav />
       </View>
-      <Nav />
-    </View>
     </TouchableWithoutFeedback>
   );
 }
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     fontFamily: 'Nunito',
-    fontWeight: 'bold', 
+    fontWeight: 'bold',
     color: '#FFFAF0',
     fontSize: 16,
     flex: 1,
