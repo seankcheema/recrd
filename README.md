@@ -7,7 +7,7 @@ a mobile social media app where users can rank albums they've listened to and se
 2. `python -m venv venv`
 3. `.\venv\Scripts\Activate.ps1` (Windows) | `source venv/bin/activate` (Mac/Linux)
 4. `pip install requirements.txt`
-5. `uvicorn main:app --reload`
+5. `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
 
 ### Front end
 1. `cd recrd`

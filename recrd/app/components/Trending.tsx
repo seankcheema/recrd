@@ -1,9 +1,41 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Dimensions, TextInput, StyleSheet, TouchableWithoutFeedback, Keyboard, Image, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Dimensions, TextInput, ActivityIndicator, StyleSheet, TouchableWithoutFeedback, Keyboard, Image, TouchableOpacity } from 'react-native';
 import Nav from './Nav';
 import GlobalText from './GlobalText';
+import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import TextTicker from 'react-native-text-ticker';
+
+const API_URL = 'http://192.168.1.71:8000';  // ← point this at your FastAPI server
 
 export default function Trending() {
+    const router = useRouter();
+    const [searchResults, setSearchResults] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    // Fetch most popular albums
+
+    useEffect(() => {
+        fetch(`http://192.168.1.71:8000/trending_albums/`)
+            .then((r) => r.json())
+            .then((data) => setSearchResults(data))
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, []);
+
+    console.log(searchResults)
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100, position: "relative", padding: 20 }}>
+
+                <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800', marginBottom: 20 }}>
+                    recrd
+                </GlobalText>
+                <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+            </View>
+        );
+    }
+
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
             <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
@@ -15,7 +47,35 @@ export default function Trending() {
                     <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
                         trending
                     </GlobalText>
-                    <TouchableOpacity>
+                    {(searchResults.length > 0) ? (
+                        searchResults.map((album: any) => (
+                            <TouchableOpacity key={album.id} onPress={() => router.push(`/components/Album/${album.id}`)}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
+                                    <Image source={{ uri: album.images[0].url }} style={{ width: 60, height: 60 }} />
+                                    <View style={{ overflow: 'hidden', flex: 1 }}>
+                                        <TextTicker
+                                            // force it to measure full width
+                                            style={[styles.globalText, { fontWeight: "800" }]}
+                                            duration={5000}
+                                            loop
+                                            bounce={false}
+                                            repeatSpacer={50}
+                                            marqueeDelay={1000}
+                                        >
+                                            {album.name}
+                                        </TextTicker>
+
+                                        <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>
+                                            by {album.artists.map((artist: { name: string }) => artist.name).join(', ')}
+                                        </GlobalText>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    ) : (
+                        <GlobalText style={{ color: '#FFFAF0A0', fontSize: 16 }}>no results found</GlobalText>
+                    )}
+                    {/* <TouchableOpacity>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
                             <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
                             <View>
@@ -59,7 +119,7 @@ export default function Trending() {
                                 <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
                             </View>
                         </View>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
 
                     <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
                         by genre
@@ -110,4 +170,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 10,
     },
+    globalText: {
+        fontFamily: 'Nunito', // Global font
+        fontSize: 16,
+        color: '#FFFAF0',
+      },
 });
