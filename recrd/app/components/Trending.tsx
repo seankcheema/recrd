@@ -12,7 +12,7 @@ export default function Trending() {
                     <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
                         recrd
                     </GlobalText>
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 5, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
                         trending
                     </GlobalText>
                     <TouchableOpacity>
@@ -61,7 +61,7 @@ export default function Trending() {
                         </View>
                     </TouchableOpacity>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 5, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
                         by genre
                     </GlobalText>
                     <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>

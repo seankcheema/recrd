@@ -33,7 +33,7 @@ export default function Home() {
             />
           </View>
 
-          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 20, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
             activity
           </GlobalText>
 
@@ -60,10 +60,10 @@ export default function Home() {
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 20}}>
                 <TouchableOpacity>
-                  <Feather name="heart" size={32} color="#FFFAF0" />
+                  <Feather name="heart" size={28} color="#FFFAF0" />
                 </TouchableOpacity>
                 <TouchableOpacity>
-                  <Feather name="message-circle" size={32} color="#FFFAF0" />
+                  <Feather name="message-circle" size={28} color="#FFFAF0" />
                 </TouchableOpacity>
             </View>
             

@@ -78,7 +78,7 @@ export default function Home() {
                         </GlobalText>
                     </View>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 5, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
                         favorite albums
                     </GlobalText>
 
@@ -100,13 +100,50 @@ export default function Home() {
                         </TouchableOpacity>
                     </View>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 20, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
                         activity
                     </GlobalText>
 
-                    <ScrollView>
-                        {/* ScrollView content here */}
-                    </ScrollView>
+                    <View style={{ flexDirection: 'column', width: '100%' }}>
+                        <TouchableOpacity style={styles.postView}>
+                            <Image source={require('@/assets/images/placeholder_album.png')} style={styles.smallpfp} />
+                            <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                                user name
+                            </GlobalText>
+                            <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
+                                listened to
+                            </GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.postView}>
+                            <Image source={require('@/assets/images/placeholder_album.png')} style={styles.smallalbum} />
+                            <View>
+                                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                                    Mr. Morale and the Big Steppers
+                                </GlobalText>
+                                <GlobalText style={{ color: '#FFFAF0A0', fontSize: 14, marginLeft: 10 }}>
+                                    by Kendrick Lamar
+                                </GlobalText>
+                            </View>
+                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 20 }}>
+                            <TouchableOpacity>
+                                <Feather name="heart" size={28} color="#FFFAF0" />
+                            </TouchableOpacity>
+                            <TouchableOpacity>
+                                <Feather name="message-circle" size={28} color="#FFFAF0" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View
+                            style={{
+                                height: StyleSheet.hairlineWidth,
+                                backgroundColor: '#FFFAF01A',
+                                marginVertical: 10,
+                            }}
+                        />
+
+
+                    </View>
                 </ScrollView>
                 <Nav />
             </View>
@@ -146,5 +183,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 5,
+    },
+    postView: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+        width: '100%',
+    },
+    smallpfp: {
+        width: 40,
+        height: 40,
+        borderRadius: 100,
+    },
+    smallalbum: {
+        width: 50,
+        height: 50,
     }
 });

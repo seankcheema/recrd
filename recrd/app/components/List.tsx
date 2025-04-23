@@ -13,7 +13,7 @@ export default function List() {
             recrd
           </GlobalText>
 
-          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 5, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
             my list
           </GlobalText>
 
