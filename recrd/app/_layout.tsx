@@ -19,8 +19,8 @@ export default function RootLayout() {
       <Stack.Screen name="components/Trending" />
       <Stack.Screen name="components/Profile" />
 
-      {/* ← Dynamic Album route */}
       <Stack.Screen name="components/Album/[albumId]" />
+      <Stack.Screen name="components/Genre/[genreName]" />
     </Stack>
   );
 }

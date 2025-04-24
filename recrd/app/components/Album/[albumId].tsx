@@ -16,6 +16,8 @@ import GlobalText from '../GlobalText';
 import Nav from '../Nav';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { HOST_IP } from '@env';
+
 
 const { width } = Dimensions.get('window');
 const COVER_SIZE = width - 80;
@@ -30,6 +32,8 @@ interface AlbumData {
   dominant_color: string;
 }
 
+
+
 export default function AlbumPage() {
   const router = useRouter();
   const { albumId } = useLocalSearchParams<{ albumId: string }>();
@@ -37,14 +41,12 @@ export default function AlbumPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://192.168.1.71:8000/albums/${albumId}`)
+    fetch(`http://${HOST_IP}:8000/albums/${albumId}`)
       .then((r) => r.json())
       .then((data) => setAlbum(data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [albumId]);
-
-  console.log(album?.dominant_color)
 
   if (loading) {
     return (
@@ -75,17 +77,15 @@ export default function AlbumPage() {
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
-        <ScrollView style={{ padding: 20, paddingTop: 0 }}>
-
-          <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20 }}>
+      <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
             <Feather name="chevron-left" size={32} color="#E7BC10" />
           </TouchableOpacity>
-
+        <ScrollView style={{ padding: 20 }}>
           <View style={styles.coverWrapper}>
             <View
               style={[
                 styles.coverShadow,
-                { shadowColor: album.dominant_color }
+                { shadowColor: album.dominant_color}
               ]}
             >
               <Image
@@ -140,6 +140,7 @@ const styles = StyleSheet.create({
     height: COVER_SIZE,
     alignSelf: 'center',
     marginBottom: 5,
+    marginTop: 20,
   },
 
   coverShadow: {

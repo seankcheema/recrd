@@ -26,6 +26,7 @@ sp = Spotify(auth_manager=auth_manager)
 
 app = FastAPI(title="Recrd Spotify API")
 
+APPLE_TOP_ALBUMS_RSS = "https://rss.applemarketingtools.com/api/v2/us/music/most-played/{limit}/albums.json"
 
 @app.get("/songs/{song_id}")
 async def get_song(song_id: str):
@@ -64,75 +65,69 @@ async def get_album(album_id: str):
 
     return album
 
-def parse_release_date(rd: str) -> datetime:
-    """
-    Spotify will give rd as:
-      - "YYYY"
-      - "YYYY-MM"
-      - "YYYY-MM-DD"
-    We want the latest possible date in that period so our 6-month test is inclusive.
-    """
-    parts = rd.split("-")
-    year = int(parts[0])
-    if len(parts) == 1:
-        # end of year
-        return datetime(year, 12, 31)
-    month = int(parts[1])
-    if len(parts) == 2:
-        # end of that month
-        last_day = calendar.monthrange(year, month)[1]
-        return datetime(year, month, last_day)
-    day = int(parts[2])
-    return datetime(year, month, day)
-
-
-@app.get("/trending_albums/")
+@app.get("/trending_albums/", response_model=List[Dict[str, Any]])
 async def trending_albums(
-    limit: int = Query(5, ge=1, le=20, description="How many trending albums to return")
+    limit: int = Query(5, ge=1, le=20, description="How many trending albums to return"),
+    genre: str = Query(None, description="Spotify genre seed (e.g. 'pop', 'rock')")
 ) -> List[Dict[str, Any]]:
     """
-    1. Fetch Spotify's 50 newest releases (browse/new-releases).
-    2. Keep only those whose release_date (at end-of-period) is within the last 6 months.
-    3. Batch-fetch full album objects (to get `popularity`).
-    4. Sort by `popularity` descending and return the top `limit`.
+    1. Fetch the top `limit` most-played albums from Apple Music RSS.
+    2. For each album, search Spotify by album name + artist.
+    3. Collect the first Spotify match for each, batch-fetch full album objects.
+    4. Return the list of Spotify album objects.
     """
     try:
-        # 1) get up to 50 “new releases”
-        resp = sp.new_releases(limit=50)
-        items = resp.get("albums", {}).get("items", [])
+        spotify_albums: List[str] = []
+        if genre:
+            # 1) Search tracks by genre
+            track_resp = sp.search(
+                q=f"genre:{genre.lower()}",
+                type="track",
+                limit=limit * 5  # over-fetch so we can dedupe
+            )
+            seen = set()
+            for t in track_resp["tracks"]["items"]:
+                alb = t.get("album", {})
+                print(f"found {alb}")
+                aid = alb.get("id")
+                if aid and aid not in seen:
+                    seen.add(aid)
+                    
+                    spotify_albums.append(alb)
+                    
+                    if len(spotify_albums) >= limit:
+                        break
+            
+        else:
+            # 1) Pull Apple’s Most-Played Albums RSS
+            rss_url = APPLE_TOP_ALBUMS_RSS.format(limit=limit*2)
+            r = requests.get(rss_url, timeout=5)
+            r.raise_for_status()
+            feed = r.json().get("feed", {}).get("results", [])
+            
+            # 2) For each Apple result, find the Spotify album ID
+            for item in feed:
+                name   = item.get("name", "")
+                artist = item.get("artistName", "")
+                # album:<name> artist:<artist> query
+                query  = f"album:{name} artist:{artist}"
+                try:
+                    res = sp.search(q=query, type="album", limit=1)
+                    albums = res.get("albums", {}).get("items", [])
+                    if albums:
+                        spotify_albums.append(albums[0])
+                    if len(spotify_albums) >= limit:
+                        break
+                except SpotifyException:
+                    # skip if Spotify returns an error for this search
+                    continue
 
-        # 2) filter by “released within last 6 months”
-        cutoff = datetime.now() - timedelta(days=182)
-        recent = [
-            alb
-            for alb in items
-            if parse_release_date(alb.get("release_date", "")) >= cutoff
-        ]
+        return spotify_albums
 
-        print(f"Found {len(recent)} albums released in the last 6 months.")
-
-        return recent[:limit]
-
-        # # 3) batch-fetch full album objects (max 20 IDs per call)
-        # full_albums: List[Dict[str, Any]] = []
-        # for i in range(0, len(recent_ids), 20):
-        #     batch = recent_ids[i : i + 20]
-        #     fetched = sp.albums(batch).get("albums", [])
-        #     full_albums.extend(fetched)
-
-        # # 4) sort by Spotify’s popularity score and take the top `limit`
-        # sorted_by_pop = sorted(
-        #     full_albums,
-        #     key=lambda a: a.get("popularity", 0),
-        #     reverse=True
-        # )
-        # return sorted_by_pop[:limit]
-
-
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Apple RSS fetch failed: {e}")
     except SpotifyException as e:
-        raise HTTPException(
-            status_code=e.http_status or 400, detail=e.msg
-        )
+        raise HTTPException(status_code=e.http_status or 400, detail=e.msg)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

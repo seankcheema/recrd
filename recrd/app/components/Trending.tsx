@@ -5,8 +5,9 @@ import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import TextTicker from 'react-native-text-ticker';
+import { HOST_IP } from '@env';
 
-const API_URL = 'http://192.168.1.71:8000';  // ← point this at your FastAPI server
+const API_URL = `http://${HOST_IP}:8000`;  // ← point this at your FastAPI server
 
 export default function Trending() {
     const router = useRouter();
@@ -15,7 +16,7 @@ export default function Trending() {
     // Fetch most popular albums
 
     useEffect(() => {
-        fetch(`http://192.168.1.71:8000/trending_albums/`)
+        fetch(`${API_URL}/trending_albums/`)
             .then((r) => r.json())
             .then((data) => setSearchResults(data))
             .catch(console.error)
@@ -75,72 +76,28 @@ export default function Trending() {
                     ) : (
                         <GlobalText style={{ color: '#FFFAF0A0', fontSize: 16 }}>no results found</GlobalText>
                     )}
-                    {/* <TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                            <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
-                            <View>
-                                <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>Mr. Morale and the Big Steppers</GlobalText>
-                                <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                            <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
-                            <View>
-                                <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>Mr. Morale and the Big Steppers</GlobalText>
-                                <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                            <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
-                            <View>
-                                <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>Mr. Morale and the Big Steppers</GlobalText>
-                                <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                            <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
-                            <View>
-                                <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>Mr. Morale and the Big Steppers</GlobalText>
-                                <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                            <Image source={require('@/assets/images/placeholder_album.png')} style={{ width: 60, height: 60 }} />
-                            <View>
-                                <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>Mr. Morale and the Big Steppers</GlobalText>
-                                <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>by Kendrick Lamar</GlobalText>
-                            </View>
-                        </View>
-                    </TouchableOpacity> */}
+                    
 
                     <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
                         by genre
                     </GlobalText>
                     <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "rap" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>rap</GlobalText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "pop" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>pop</GlobalText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "r&b" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>r&b</GlobalText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "indie" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>indie</GlobalText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "country" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>country</GlobalText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "hip-hop" },})}>
                             <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>hip-hop</GlobalText>
                         </TouchableOpacity>
                     </View>
