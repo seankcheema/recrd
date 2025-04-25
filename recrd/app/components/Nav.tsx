@@ -37,7 +37,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#111111',
     padding: 10,
-    height: 90,
+    paddingTop: 0,
+    height: 80,
     width: '100%',
   },
   navList: {

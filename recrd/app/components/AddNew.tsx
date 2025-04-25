@@ -13,7 +13,6 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import Nav from './Nav';
 import TextTicker from 'react-native-text-ticker';
 import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
@@ -47,6 +46,7 @@ export default function AddNew() {
   const performSearch = async () => {
     setLoading(true);
     try {
+
       const resp = await fetch(
         `${API_URL}/search/?q=${encodeURIComponent(searchQuery)}&limit=5`
       );
@@ -75,7 +75,7 @@ export default function AddNew() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
         <ScrollView style={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
-          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
             recrd
           </GlobalText>
 
@@ -96,33 +96,22 @@ export default function AddNew() {
 
           {!loading && !searchResults && (
             <View>
-              <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontWeight: '700' }}>
+              <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold'}}>
                 recent searches
               </GlobalText>
             </View>
           )}
 
-          {loading && !searchResults && <ActivityIndicator />}
+          {loading && !searchResults && (
+            <View>
+            </View>
+          )}
 
           {/* Results */}
           {searchResults && (
             <View>
-              {/* <View style={{ marginBottom: 15 }}>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontWeight: '700' }}>
-                  combined
-                </GlobalText>
-                {searchResults.combined.length > 0 ? (
-                  searchResults.combined.map((item: any) => (
-                    <GlobalText key={item.id} >
-                      {item.name}
-                    </GlobalText>
-                  ))
-                ) : (
-                  <Text style={{ color: '#888', fontStyle: 'italic' }}>no results</Text>
-                )}
-              </View> */}
               <View style={{ marginBottom: 15 }}>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontWeight: '800', marginBottom: 10 }}>
+                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold', marginBottom: 10 }}>
                   albums
                 </GlobalText>
                 {searchResults.albums.length > 0 ? (
@@ -139,7 +128,7 @@ export default function AddNew() {
                       <View style={{ overflow: 'hidden', flex: 1 }}>
                         <TextTicker
                           // force it to measure full width
-                          style={[styles.globalText, { fontWeight: "800"}]}
+                          style={[styles.globalText, { fontFamily: 'Nunito-Bold'}]}
                           duration={5000}
                           loop
                           bounce={false}
@@ -160,7 +149,7 @@ export default function AddNew() {
                 )}
               </View>
               <View style={{ marginBottom: 15 }}>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontWeight: '800', marginBottom: 10 }}>
+                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold', marginBottom: 10 }}>
                   artists
                 </GlobalText>
                 {searchResults.artists.length > 0 ? (
@@ -175,7 +164,7 @@ export default function AddNew() {
                         style={styles.smallpfp}
                       />
                       <View>
-                        <GlobalText style={{ fontSize: 16, fontWeight: 'bold' }}>{item.name}</GlobalText>
+                        <GlobalText style={{ fontSize: 16, fontFamily: 'Nunito-Bold' }}>{item.name}</GlobalText>
                       </View>
                     </TouchableOpacity>
                   ))
@@ -187,7 +176,6 @@ export default function AddNew() {
           )}
 
         </ScrollView>
-        <Nav />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -211,8 +199,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   searchBar: {
-    fontFamily: 'Nunito',
-    fontWeight: 'bold',
+    fontFamily: 'Nunito-Bold',
     color: '#FFFAF0',
     fontSize: 16,
     flex: 1,
@@ -234,7 +221,7 @@ const styles = StyleSheet.create({
     height: 45,
   },
   globalText: {
-    fontFamily: 'Nunito', // Global font
+    fontFamily: 'Nunito-Regular', // Global font
     fontSize: 16,
     color: '#FFFAF0',
   },

@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';    // ← useLocalSearchParams, not useSearchParams
 import GlobalText from '../GlobalText';
-import Nav from '../Nav';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HOST_IP } from '@env';
@@ -26,7 +25,7 @@ export default function GenrePage() {
     const [searchResults, setSearchResults] = useState<any>(null);
 
     useEffect(() => {
-        console.log(genreName);
+        
         fetch(`http://${HOST_IP}:8000/trending_albums/?limit=10&genre=${genreName}`)
             .then((r) => r.json())
             .then((data) => setSearchResults(data))
@@ -36,12 +35,13 @@ export default function GenrePage() {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100, position: "relative", padding: 20 }}>
+            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
+                        <Feather name="chevron-left" size={32} color="#E7BC10" />
+                    </TouchableOpacity>
 
-                <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800', marginBottom: 20 }}>
-                    recrd
-                </GlobalText>
-                <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+                    <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+
             </View>
         );
     }
@@ -69,7 +69,7 @@ export default function GenrePage() {
                                     <View style={{ overflow: 'hidden', flex: 1 }}>
                                         <TextTicker
                                             // force it to measure full width
-                                            style={[styles.globalText, { fontWeight: "800" }]}
+                                            style={[styles.globalText, { fontFamily: 'Nunito-Bold' }]}
                                             duration={5000}
                                             loop
                                             bounce={false}
@@ -91,7 +91,6 @@ export default function GenrePage() {
                     )}
 
                 </ScrollView>
-                <Nav />
             </View>
         </TouchableWithoutFeedback>
     );
@@ -99,7 +98,7 @@ export default function GenrePage() {
 
 const styles = StyleSheet.create({
     globalText: {
-        fontFamily: 'Nunito', // Global font
+        fontFamily: 'Nunito-Regular', // Global font
         fontSize: 16,
         color: '#FFFAF0',
     },

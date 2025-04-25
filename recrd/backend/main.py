@@ -83,12 +83,15 @@ async def trending_albums(
             track_resp = sp.search(
                 q=f"genre:{genre.lower()}",
                 type="track",
-                limit=limit * 5  # over-fetch so we can dedupe
+                limit=limit * 2  # over-fetch so we can dedupe
             )
             seen = set()
             for t in track_resp["tracks"]["items"]:
                 alb = t.get("album", {})
-                print(f"found {alb}")
+
+                if alb.get("album_type") != "album":
+                    continue
+
                 aid = alb.get("id")
                 if aid and aid not in seen:
                     seen.add(aid)

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Dimensions, View, Text, ScrollView, TextInput, StyleSheet, Image, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
-import Nav from './Nav';
 import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
 
@@ -16,18 +15,18 @@ export default function Home() {
             <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
                 <ScrollView style={{ padding: 20, paddingTop: 0 }}>
 
-                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
                         username
                     </GlobalText>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, width: '100%' }}>
                         <Image source={require('@/assets/images/placeholder_album.png')} style={styles.pfp} />
                         <View style={styles.profileInfo}>
-                            <GlobalText style={{ color: '#FFFAF0', fontSize: 24, fontWeight: '800', marginBottom: "auto", flexWrap: "wrap", maxWidth: '100%' }}>
+                            <GlobalText style={{ color: '#FFFAF0', fontSize: 24, fontFamily: 'Nunito-Bold', marginBottom: "auto", flexWrap: "wrap", maxWidth: '100%' }}>
                                 user name
                             </GlobalText>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, width: '100%', justifyContent: 'space-between' }}>
                                 <TouchableOpacity style={{ flexDirection: 'column', alignItems: 'center', marginTop: 5 }}>
-                                    <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5, fontWeight: '800' }}>
+                                    <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5, fontFamily: 'Nunito-Bold' }}>
                                         1,000
                                     </GlobalText>
                                     <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
@@ -35,7 +34,7 @@ export default function Home() {
                                     </GlobalText>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={{ flexDirection: 'column', alignItems: 'center', marginTop: 5 }}>
-                                    <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5, fontWeight: '800' }}>
+                                    <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5, fontFamily: 'Nunito-Bold' }}>
                                         1,000
                                     </GlobalText>
                                     <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
@@ -64,13 +63,13 @@ export default function Home() {
                     </View>
 
                     <View style={{ flexDirection: 'row', gap: 4 }}>
-                        <GlobalText style={{ fontSize: 12, marginTop: 5, fontWeight: '800' }}>
+                        <GlobalText style={{ fontSize: 12, marginTop: 5, fontFamily: 'Nunito-Bold' }}>
                             12
                         </GlobalText>
                         <GlobalText style={{ fontSize: 12, marginTop: 5 }}>
                             total rankings ∙
                         </GlobalText>
-                        <GlobalText style={{ fontSize: 12, marginTop: 5, fontWeight: '800' }}>
+                        <GlobalText style={{ fontSize: 12, marginTop: 5, fontFamily: 'Nunito-Bold' }}>
                             3
                         </GlobalText>
                         <GlobalText style={{ fontSize: 12, marginTop: 5 }}>
@@ -78,7 +77,7 @@ export default function Home() {
                         </GlobalText>
                     </View>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
                         favorite albums
                     </GlobalText>
 
@@ -100,14 +99,14 @@ export default function Home() {
                         </TouchableOpacity>
                     </View>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
                         activity
                     </GlobalText>
 
                     <View style={{ flexDirection: 'column', width: '100%' }}>
                         <TouchableOpacity style={styles.postView}>
                             <Image source={require('@/assets/images/placeholder_album.png')} style={styles.smallpfp} />
-                            <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                            <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
                                 user name
                             </GlobalText>
                             <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
@@ -117,7 +116,7 @@ export default function Home() {
                         <TouchableOpacity style={styles.postView}>
                             <Image source={require('@/assets/images/placeholder_album.png')} style={styles.smallalbum} />
                             <View>
-                                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
                                     Mr. Morale and the Big Steppers
                                 </GlobalText>
                                 <GlobalText style={{ color: '#FFFAF0A0', fontSize: 14, marginLeft: 10 }}>
@@ -145,7 +144,7 @@ export default function Home() {
 
                     </View>
                 </ScrollView>
-                <Nav />
+
             </View>
         </TouchableWithoutFeedback>
     );

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Dimensions, TextInput, ActivityIndicator, StyleSheet, TouchableWithoutFeedback, Keyboard, Image, TouchableOpacity } from 'react-native';
-import Nav from './Nav';
 import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import TextTicker from 'react-native-text-ticker';
 import { HOST_IP } from '@env';
 
-const API_URL = `http://${HOST_IP}:8000`;  // ← point this at your FastAPI server
+const API_URL = `http://${HOST_IP}:8000`; 
 
 export default function Trending() {
     const router = useRouter();
@@ -23,16 +22,50 @@ export default function Trending() {
             .finally(() => setLoading(false));
     }, []);
 
-    console.log(searchResults)
-
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100, position: "relative", padding: 20 }}>
+            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
+                <ScrollView style={{ padding: 20, paddingVertical: 0 }}>
 
-                <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800', marginBottom: 20 }}>
-                    recrd
-                </GlobalText>
-                <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
+                        recrd
+                    </GlobalText>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
+                        trending
+                    </GlobalText>
+                    <ActivityIndicator />
+                    
+
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
+                        by genre
+                    </GlobalText>
+                    <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "rap" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>rap</GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "pop" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>pop</GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "r&b" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>r&b</GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "indie" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>indie</GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "country" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>country</GlobalText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "hip-hop" },})}>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>hip-hop</GlobalText>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 15 }}>
+                        <TouchableOpacity style={{ height: 30, width: 100, backgroundColor: "#1e1e1e", alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
+                            <GlobalText>view all</GlobalText>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+
             </View>
         );
     }
@@ -42,10 +75,10 @@ export default function Trending() {
             <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
                 <ScrollView style={{ padding: 20, paddingTop: 0 }}>
 
-                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
                         recrd
                     </GlobalText>
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
                         trending
                     </GlobalText>
                     {(searchResults.length > 0) ? (
@@ -56,7 +89,7 @@ export default function Trending() {
                                     <View style={{ overflow: 'hidden', flex: 1 }}>
                                         <TextTicker
                                             // force it to measure full width
-                                            style={[styles.globalText, { fontWeight: "800" }]}
+                                            style={[styles.globalText, { fontFamily: 'Nunito-Bold' }]}
                                             duration={5000}
                                             loop
                                             bounce={false}
@@ -78,27 +111,27 @@ export default function Trending() {
                     )}
                     
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
+                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
                         by genre
                     </GlobalText>
                     <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "rap" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>rap</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>rap</GlobalText>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "pop" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>pop</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>pop</GlobalText>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "r&b" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>r&b</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>r&b</GlobalText>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "indie" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>indie</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>indie</GlobalText>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "country" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>country</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>country</GlobalText>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]} onPress={() => router.push({pathname: "/components/Genre/[genreName]", params: { genreName: "hip-hop" },})}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontWeight: 'bold' }}>hip-hop</GlobalText>
+                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>hip-hop</GlobalText>
                         </TouchableOpacity>
                     </View>
                     <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 15 }}>
@@ -107,7 +140,7 @@ export default function Trending() {
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
-                <Nav />
+
             </View>
         </TouchableWithoutFeedback>
     );
@@ -128,7 +161,7 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     globalText: {
-        fontFamily: 'Nunito', // Global font
+        fontFamily: 'Nunito-Regular', // Global font
         fontSize: 16,
         color: '#FFFAF0',
       },

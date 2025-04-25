@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';    // ← useLocalSearchParams, not useSearchParams
 import GlobalText from '../GlobalText';
-import Nav from '../Nav';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HOST_IP } from '@env';
@@ -41,6 +40,7 @@ export default function AlbumPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+
     fetch(`http://${HOST_IP}:8000/albums/${albumId}`)
       .then((r) => r.json())
       .then((data) => setAlbum(data))
@@ -50,13 +50,15 @@ export default function AlbumPage() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100, position: "relative", padding: 20 }}>
+      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
+                        <Feather name="chevron-left" size={32} color="#E7BC10" />
+                    </TouchableOpacity>
 
-        <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800', marginBottom: 20 }}>
-          recrd
-        </GlobalText>
-        <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
-      </View>
+                    <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+
+
+            </View>
     );
   }
   if (!album) {
@@ -121,12 +123,12 @@ export default function AlbumPage() {
           </View>
 
 
-          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
             friends' rankings
           </GlobalText>
 
         </ScrollView>
-        <Nav />
+
       </View>
     </TouchableWithoutFeedback>
   );
@@ -158,7 +160,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Nunito-Bold',
   },
   artists: {
     fontSize: 14,

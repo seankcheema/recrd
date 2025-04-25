@@ -12,7 +12,7 @@ const GlobalText: React.FC<TextProps> = ({ style, children, ...props }) => {
 
 const styles = StyleSheet.create({
   globalText: {
-    fontFamily: 'Nunito', // Global font
+    fontFamily: 'Nunito-Regular', // Global font
     fontSize: 16,
     color: '#FFFAF0',
   },

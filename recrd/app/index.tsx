@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Image } from 'react-native';
-import Nav from './components/Nav';
 import GlobalText from './components/GlobalText';
 import { Feather } from '@expo/vector-icons';
 
@@ -16,7 +15,7 @@ export default function Home() {
       <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
         <ScrollView style={{ padding: 20, paddingTop: 0 }}>
 
-          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
             recrd
           </GlobalText>
 
@@ -33,14 +32,14 @@ export default function Home() {
             />
           </View>
 
-          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontWeight: '800' }}>
+          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
             activity
           </GlobalText>
 
           <View style={{ flexDirection: 'column', width: '100%'}}>
             <TouchableOpacity style={styles.postView}>
                 <Image source={require('@/assets/images/placeholder_album.png')} style={styles.pfp} />
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
                   user name
                 </GlobalText>
                 <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
@@ -50,7 +49,7 @@ export default function Home() {
             <TouchableOpacity style={styles.postView}>
                 <Image source={require('@/assets/images/placeholder_album.png')} style={styles.album} />
                 <View>
-                  <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>
+                  <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
                     Mr. Morale and the Big Steppers
                   </GlobalText>
                   <GlobalText style={{ color: '#FFFAF0A0', fontSize: 14, marginLeft: 10 }}>
@@ -80,7 +79,7 @@ export default function Home() {
 
 
         </ScrollView>
-        <Nav />
+
       </View>
     </TouchableWithoutFeedback>
   );
@@ -100,8 +99,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchBar: {
-    fontFamily: 'Nunito',
-    fontWeight: 'bold',
+    fontFamily: 'Nunito-Bold',
     color: '#FFFAF0',
     fontSize: 16,
     flex: 1,
