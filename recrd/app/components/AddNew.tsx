@@ -154,7 +154,7 @@ export default function AddNew() {
                 </GlobalText>
                 {searchResults.artists.length > 0 ? (
                   searchResults.artists.map((item: any) => (
-                    <TouchableOpacity key={item.id} style={styles.albumView}>
+                    <TouchableOpacity key={item.id} style={styles.albumView} onPress={() => router.push(`/components/Artist/${item.id}`)}>
                       <Image
                         source={
                           item.images?.length

@@ -24,7 +24,7 @@ const COVER_SIZE = width - 80;
 interface AlbumData {
   id: string;
   name: string;
-  artists: { name: string }[];
+  artists: { id: string; name: string }[];
   images: { url: string }[];
   release_date: string;
   tracks: { items: { duration_ms: number }[] };
@@ -51,14 +51,14 @@ export default function AlbumPage() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
-                        <Feather name="chevron-left" size={32} color="#E7BC10" />
-                    </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
+          <Feather name="chevron-left" size={32} color="#E7BC10" />
+        </TouchableOpacity>
 
-                    <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
+        <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
 
 
-            </View>
+      </View>
     );
   }
   if (!album) {
@@ -79,15 +79,15 @@ export default function AlbumPage() {
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70 }}>
-      <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
-            <Feather name="chevron-left" size={32} color="#E7BC10" />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
+          <Feather name="chevron-left" size={32} color="#E7BC10" />
+        </TouchableOpacity>
         <ScrollView style={{ padding: 20 }} contentContainerStyle={{ paddingBottom: 80 }}>
           <View style={styles.coverWrapper}>
             <View
               style={[
                 styles.coverShadow,
-                { shadowColor: album.dominant_color}
+                { shadowColor: album.dominant_color }
               ]}
             >
               <Image
@@ -103,9 +103,11 @@ export default function AlbumPage() {
           </View>
           <View style={{ paddingHorizontal: 20 }}>
             <GlobalText style={styles.title}>{album.name}</GlobalText>
+            <TouchableOpacity onPress={() => router.push(`/components/Artist/${album.artists[0].id}`)}>
             <GlobalText style={styles.artists}>
               by {album.artists.map((a) => a.name).join(', ')}
             </GlobalText>
+            </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
               <GlobalText style={{ fontSize: 12 }}>
                 {releaseYear}
@@ -167,11 +169,11 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   albumActions: {
-    position: "absolute", 
-    bottom: 5, 
-    right: 5, 
-    justifyContent: 'space-between', 
-    gap: 20, 
+    position: "absolute",
+    bottom: 5,
+    right: 5,
+    justifyContent: 'space-between',
+    gap: 20,
     flexDirection: 'row',
     backgroundColor: "#111111F2",
     paddingHorizontal: 10,

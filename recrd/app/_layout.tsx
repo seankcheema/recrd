@@ -64,8 +64,11 @@ export default function RootLayout() {
           name="components/Genre/[genreName]"
           options={{ animation: 'slide_from_right' }}
         />
+        <Stack.Screen
+          name="components/Artist/[artistId]"
+          options={{ animation: 'slide_from_right' }}
+        />
       </Stack>
-
       {/* Fixed Nav bar outside the Stack */}
       <View>
         <Nav />

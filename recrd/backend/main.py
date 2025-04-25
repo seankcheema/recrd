@@ -50,6 +50,22 @@ def get_artist(artist_id: str):
     """
     try:
         artist = sp.artist(artist_id)
+
+        image_url = artist.get("images", [{}])[0].get("url")
+        if image_url:
+            # 3) download the image bytes
+            resp = requests.get(image_url, timeout=5)
+            resp.raise_for_status()
+            img_data = BytesIO(resp.content)
+
+            # 4) extract the dominant color
+            ct = ColorThief(img_data)
+            r, g, b = ct.get_color(quality=1)
+            # 5) store it as a hex string
+            dominant_color = f"#{r:02x}{g:02x}{b:02x}"
+            # fallback if anything goes wrong
+        else:
+            dominant_color = "#000000"
     except Exception:
         raise HTTPException(status_code=404, detail="Artist not found")
 
@@ -80,6 +96,7 @@ def get_artist(artist_id: str):
         "name": artist.get("name"),
         "images": artist.get("images", []),
         "albums": deduped,
+        "dominant_color": dominant_color
     }
 
 @app.get("/albums/{album_id}")
