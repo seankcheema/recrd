@@ -54,12 +54,12 @@ export default function GenrePage() {
     }
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
+            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70}}>
             <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
                         <Feather name="chevron-left" size={32} color="#E7BC10" />
                     </TouchableOpacity>
 
-                <ScrollView style={{ padding: 20, paddingTop: 0 }}>
+                <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 100 }}>
 
                     {(searchResults.length > 0) ? (
                         searchResults.map((album: any) => (

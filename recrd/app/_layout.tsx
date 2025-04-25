@@ -67,7 +67,7 @@ export default function RootLayout() {
       </Stack>
 
       {/* Fixed Nav bar outside the Stack */}
-      <View style={styles.navWrapper}>
+      <View>
         <Nav />
       </View>
     </View>
@@ -77,11 +77,5 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  navWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
 });

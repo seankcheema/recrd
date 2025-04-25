@@ -73,8 +73,8 @@ export default function AddNew() {
   return (
     
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
-        <ScrollView style={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70}}>
+        <ScrollView style={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
           <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
             recrd
           </GlobalText>
