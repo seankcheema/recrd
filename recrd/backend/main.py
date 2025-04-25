@@ -38,6 +38,50 @@ async def get_song(song_id: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Track not found: {e}")
 
+@app.get("/artists/{artist_id}")
+def get_artist(artist_id: str):
+    """
+    Fetch artist information and their full albums by artist_id.
+    Returns JSON with:
+      - id: Spotify artist ID
+      - name: Artist name
+      - images: List of image objects
+      - albums: Deduplicated list of albums with id, name, images
+    """
+    try:
+        artist = sp.artist(artist_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Artist not found")
+
+    # Fetch artist's full albums
+    albums_resp = sp.artist_albums(
+        artist_id,
+        include_groups="album",
+        limit=50
+    )
+    items = albums_resp.get("items", [])
+
+    # Deduplicate albums by ID
+    seen = set()
+    deduped = []
+    for alb in items:
+        aid = alb.get("id")
+
+        if aid and aid not in seen:
+            seen.add(aid)
+            deduped.append({
+                "id": aid,
+                "name": alb.get("name"),
+                "images": alb.get("images", []),
+            })
+
+    return {
+        "id": artist.get("id"),
+        "name": artist.get("name"),
+        "images": artist.get("images", []),
+        "albums": deduped,
+    }
+
 @app.get("/albums/{album_id}")
 async def get_album(album_id: str):
     # 1) fetch the raw album object from Spotify

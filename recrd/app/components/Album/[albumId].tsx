@@ -82,7 +82,7 @@ export default function AlbumPage() {
       <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
             <Feather name="chevron-left" size={32} color="#E7BC10" />
           </TouchableOpacity>
-        <ScrollView style={{ padding: 20 }} contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView style={{ padding: 20 }} contentContainerStyle={{ paddingBottom: 80 }}>
           <View style={styles.coverWrapper}>
             <View
               style={[

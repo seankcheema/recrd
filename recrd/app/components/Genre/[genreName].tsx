@@ -59,7 +59,7 @@ export default function GenrePage() {
                         <Feather name="chevron-left" size={32} color="#E7BC10" />
                     </TouchableOpacity>
 
-                <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 100 }}>
+                <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 80 }}>
 
                     {(searchResults.length > 0) ? (
                         searchResults.map((album: any) => (

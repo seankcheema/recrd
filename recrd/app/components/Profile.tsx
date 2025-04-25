@@ -13,7 +13,7 @@ export default function Home() {
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
             <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70}}>
-                <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 100 }}>
+                <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 80 }}>
 
                     <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
                         username
