@@ -29,6 +29,12 @@ export default function AddNew() {
     setSearchQuery(text);
   };
 
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults(null);
+    }
+  }, [searchQuery]);
+
   // Debounce the fetch so we don't fire on every keystroke
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -70,6 +76,12 @@ export default function AddNew() {
       params: { albumId: id },
     });
   };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+  };
+
   return (
     
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -92,6 +104,11 @@ export default function AddNew() {
               returnKeyType="search"
               onSubmitEditing={performSearch}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={handleClearSearch} >
+                <Feather name="x-circle" size={20} color="#FFFAF0" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {!loading && !searchResults && (
