@@ -9,8 +9,7 @@ from typing import Dict, Any, List
 import requests
 from io import BytesIO
 from colorthief import ColorThief
-from datetime import datetime, timedelta
-import calendar
+import time
 
 load_dotenv()
 CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -163,27 +162,39 @@ async def trending_albums(
                         break
             
         else:
-            # 1) Pull Apple’s Most-Played Albums RSS
-            rss_url = APPLE_TOP_ALBUMS_RSS.format(limit=limit*2)
-            r = requests.get(rss_url, timeout=5)
-            r.raise_for_status()
-            feed = r.json().get("feed", {}).get("results", [])
-            
-            # 2) For each Apple result, find the Spotify album ID
+            rss_url = APPLE_TOP_ALBUMS_RSS.format(limit=limit * 2)
+
+            # ─── RETRY LOGIC ─────────────────────────────────────────
+            feed = []
+            max_retries = 3
+            for attempt in range(1, max_retries + 1):
+                try:
+                    resp = requests.get(rss_url, timeout=5)
+                    resp.raise_for_status()
+                    feed = resp.json().get("feed", {}).get("results", [])
+                    break
+                except requests.RequestException as e:
+                    if attempt == max_retries:
+                        # final failure → 502
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"Apple RSS fetch failed after {max_retries} attempts: {e}"
+                        )
+                    # wait before next try (2s, then 4s, …)
+                    time.sleep(2 ** attempt)
+            # ──────────────────────────────────────────────────────────
+
+            # process `feed` into spotify_albums as before
             for item in feed:
-                name   = item.get("name", "")
+                name = item.get("name", "")
                 artist = item.get("artistName", "")
-                # album:<name> artist:<artist> query
-                query  = f"album:{name} artist:{artist}"
+                query = f"album:{name} artist:{artist}"
                 try:
                     res = sp.search(q=query, type="album", limit=1)
                     albums = res.get("albums", {}).get("items", [])
-                    if albums:
+                    if albums and len(spotify_albums) < limit:
                         spotify_albums.append(albums[0])
-                    if len(spotify_albums) >= limit:
-                        break
                 except SpotifyException:
-                    # skip if Spotify returns an error for this search
                     continue
 
         return spotify_albums
