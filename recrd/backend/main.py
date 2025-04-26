@@ -10,6 +10,7 @@ import requests
 from io import BytesIO
 from colorthief import ColorThief
 import time
+from auth_firebase import router as auth_router
 
 load_dotenv()
 CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -24,6 +25,7 @@ auth_manager = SpotifyClientCredentials(
 sp = Spotify(auth_manager=auth_manager)
 
 app = FastAPI(title="Recrd Spotify API")
+app.include_router(auth_router)
 
 APPLE_TOP_ALBUMS_RSS = "https://rss.applemarketingtools.com/api/v2/us/music/most-played/{limit}/albums.json"
 
