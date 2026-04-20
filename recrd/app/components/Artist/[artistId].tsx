@@ -14,8 +14,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import GlobalText from '../GlobalText';
 import { Feather } from '@expo/vector-icons';
-import { HOST_IP } from '@env';
 import TextTicker from 'react-native-text-ticker';
+import { API_URL } from '../api';
 
 const { width } = Dimensions.get('window');
 const COVER_SIZE = width - 80;
@@ -41,7 +41,7 @@ export default function ArtistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://${HOST_IP}:8000/artists/${artistId}`)
+    fetch(`${API_URL}/artists/${artistId}`)
       .then(res => res.json())
       .then(data => setArtist(data))
       .catch(console.error)

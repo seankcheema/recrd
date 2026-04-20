@@ -16,9 +16,7 @@ import {
 import TextTicker from 'react-native-text-ticker';
 import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
-import { HOST_IP } from '@env';
-
-const API_URL = `http://${HOST_IP}:8000`;  // ← point this at your FastAPI server
+import { API_URL } from './api';
 
 export default function AddNew() {
   const [searchQuery, setSearchQuery] = useState<string>('');

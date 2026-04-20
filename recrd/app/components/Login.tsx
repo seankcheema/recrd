@@ -13,9 +13,7 @@ import {
 } from 'react-native';
 import GlobalText from '../components/GlobalText';
 import { useRouter } from 'expo-router';
-import { HOST_IP } from '@env';
-
-const API_URL = `http://${HOST_IP}:8000`;
+import { API_URL } from '../components/api';
 
 export default function LoginPage() {
   const router = useRouter();
