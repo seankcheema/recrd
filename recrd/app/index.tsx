@@ -1,122 +1,297 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Image } from 'react-native';
-import GlobalText from './components/GlobalText';
-import { Feather } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import GlobalText from '@/lib/GlobalText';
+import ActivityPost from '@/lib/ActivityPost';
+import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import SearchField from '@/lib/SearchField';
+import { Glass, GlassButton } from '@/lib/Glass';
+import { apiJson } from '@/lib/session';
+import { API_URL } from '@/lib/api';
+import { colors, font, radius, spacing } from '@/lib/theme';
+import type { Entry, PersonRow } from '@/lib/types';
+
+interface SpotifyHit {
+  id: string;
+  name: string;
+  images?: { url: string }[];
+  artists?: { name: string }[];
+}
 
 export default function Home() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [feed, setFeed] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
-  };
+  const [searching, setSearching] = useState(false);
+  const [people, setPeople] = useState<PersonRow[]>([]);
+  const [albums, setAlbums] = useState<SpotifyHit[]>([]);
+  const [artists, setArtists] = useState<SpotifyHit[]>([]);
+
+  const loadFeed = useCallback(async () => {
+    try {
+      setFeed(await apiJson<Entry[]>('/feed'));
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Refresh whenever the tab regains focus so new rankings show up.
+  useFocusEffect(
+    useCallback(() => {
+      loadFeed();
+    }, [loadFeed])
+  );
+
+  // Debounced search across people, albums and artists.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setPeople([]);
+      setAlbums([]);
+      setArtists([]);
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearching(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const [users, spotify] = await Promise.all([
+          apiJson<PersonRow[]>(`/users/search?q=${encodeURIComponent(q)}&limit=5`).catch(() => []),
+          fetch(`${API_URL}/search/?q=${encodeURIComponent(q)}&limit=4`)
+            .then((r) => (r.ok ? r.json() : { albums: [], artists: [] }))
+            .catch(() => ({ albums: [], artists: [] })),
+        ]);
+        if (cancelled) return;
+        setPeople(users);
+        setAlbums(spotify.albums || []);
+        setArtists(spotify.artists || []);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery]);
+
+  const showResults = searchQuery.trim().length >= 2;
+
+  const replaceEntry = (updated: Entry) =>
+    setFeed((prev) => prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e)));
 
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70 }}>
-        <ScrollView style={{ padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 80 }}>
+    <Screen
+      title="recrd"
+      onRefresh={() => {
+        setRefreshing(true);
+        loadFeed();
+      }}
+      refreshing={refreshing}
+    >
+      <SearchField
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="album, artist, or friend"
+      />
 
-          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
-            recrd
-          </GlobalText>
+      {showResults ? (
+        <View>
+          {searching && (
+            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
+          )}
 
-          {/* Search Bar Component */}
-          <View style={styles.searchBarContainer}>
-            <Feather name="search" size={24} color="#FFFAF0" />
-            <TextInput
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              placeholder="search an album, artist, or friend"
-              placeholderTextColor="#FFFAF0A0"
-              style={styles.searchBar}
-              maxLength={25}
-            />
-          </View>
-
-          <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
-            activity
-          </GlobalText>
-
-          <View style={{ flexDirection: 'column', width: '100%'}}>
-            <TouchableOpacity style={styles.postView}>
-                <Image source={require('@/assets/images/placeholder_album.png')} style={styles.pfp} />
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
-                  user name
-                </GlobalText>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 14, marginLeft: 5 }}>
-                  listened to
-                </GlobalText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.postView}>
-                <Image source={require('@/assets/images/placeholder_album.png')} style={styles.album} />
-                <View>
-                  <GlobalText style={{ color: '#FFFAF0', fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 10 }}>
-                    Mr. Morale and the Big Steppers
+          <SectionHeader>friends</SectionHeader>
+          {people.length > 0 ? (
+            people.map((person) => (
+              <Pressable
+                key={person.id}
+                style={styles.row}
+                onPress={() => router.push(`/components/User/${person.id}`)}
+              >
+                <Image
+                  source={
+                    person.avatarUrl
+                      ? { uri: person.avatarUrl }
+                      : require('@/assets/images/placeholder_album.png')
+                  }
+                  style={styles.pfp}
+                />
+                <View style={{ flex: 1 }}>
+                  <GlobalText style={styles.rowTitle} numberOfLines={1}>
+                    {person.name}
                   </GlobalText>
-                  <GlobalText style={{ color: '#FFFAF0A0', fontSize: 14, marginLeft: 10 }}>
-                    by Kendrick Lamar
+                  {person.isFollowing && (
+                    <GlobalText style={styles.rowSub}>following</GlobalText>
+                  )}
+                </View>
+              </Pressable>
+            ))
+          ) : (
+            <Empty>no people found</Empty>
+          )}
+
+          <SectionHeader>albums</SectionHeader>
+          {albums.length > 0 ? (
+            albums.map((album) => (
+              <Pressable
+                key={album.id}
+                style={styles.row}
+                onPress={() => router.push(`/components/Album/${album.id}`)}
+              >
+                <Image
+                  source={
+                    album.images?.length
+                      ? { uri: album.images[0].url }
+                      : require('@/assets/images/album-placeholder.png')
+                  }
+                  style={styles.cover}
+                />
+                <View style={{ flex: 1 }}>
+                  <GlobalText style={styles.rowTitle} numberOfLines={1}>
+                    {album.name}
+                  </GlobalText>
+                  <GlobalText style={styles.rowSub} numberOfLines={1}>
+                    {(album.artists || []).map((a) => a.name).join(', ')}
                   </GlobalText>
                 </View>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 20}}>
-                <TouchableOpacity>
-                  <Feather name="heart" size={28} color="#FFFAF0" />
-                </TouchableOpacity>
-                <TouchableOpacity>
-                  <Feather name="message-circle" size={28} color="#FFFAF0" />
-                </TouchableOpacity>
-            </View>
-            
-            <View
-              style={{
-                height: StyleSheet.hairlineWidth,
-                backgroundColor: '#FFFAF01A',
-                marginVertical: 10,
-              }}
-            />
+              </Pressable>
+            ))
+          ) : (
+            <Empty>no albums found</Empty>
+          )}
 
-            
-          </View>
+          <SectionHeader>artists</SectionHeader>
+          {artists.length > 0 ? (
+            artists.map((artist) => (
+              <Pressable
+                key={artist.id}
+                style={styles.row}
+                onPress={() => router.push(`/components/Artist/${artist.id}`)}
+              >
+                <Image
+                  source={
+                    artist.images?.length
+                      ? { uri: artist.images[0].url }
+                      : require('@/assets/images/artist-placeholder.png')
+                  }
+                  style={styles.pfp}
+                />
+                <GlobalText style={[styles.rowTitle, { flex: 1 }]} numberOfLines={1}>
+                  {artist.name}
+                </GlobalText>
+              </Pressable>
+            ))
+          ) : (
+            <Empty>no artists found</Empty>
+          )}
+        </View>
+      ) : (
+        <>
+          <SectionHeader>activity</SectionHeader>
 
-
-        </ScrollView>
-
-      </View>
-    </TouchableWithoutFeedback>
+          {loading ? (
+            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
+          ) : error ? (
+            <Empty>{error}</Empty>
+          ) : feed.length === 0 ? (
+            <Glass style={styles.emptyCard} cornerRadius={radius.lg} tone="clear">
+              <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.md }}>
+                <GlobalText style={styles.emptyTitle}>it's quiet in here</GlobalText>
+                <GlobalText style={styles.emptyBody}>
+                  rank an album, or follow someone to see what they're listening to.
+                </GlobalText>
+                <GlassButton
+                  style={{ marginTop: spacing.xs }}
+                  onPress={() => router.push('/components/AddNew')}
+                >
+                  <View style={styles.ctaInner}>
+                    <GlobalText style={styles.ctaText}>find an album</GlobalText>
+                  </View>
+                </GlassButton>
+              </View>
+            </Glass>
+          ) : (
+            feed.map((entry) => (
+              <ActivityPost key={entry.id} entry={entry} onChange={replaceEntry} />
+            ))
+          )}
+        </>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  searchBarContainer: {
-    height: 50,
-    borderColor: '#E7BC10',
-    borderWidth: 0.5,
-    borderRadius: 15,
-    padding: 10,
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e1e1e',
-    marginTop: 20,
-    gap: 10,
-  },
-  searchBar: {
-    fontFamily: 'Nunito-Bold',
-    color: '#FFFAF0',
-    fontSize: 16,
-    flex: 1,
-  },
-  postView: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
   pfp: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
+    width: 42,
+    height: 42,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgLift,
   },
-  album: {
-    width: 50,
-    height: 50,
-  }
+  cover: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
+  },
+  rowTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.bold,
+  },
+  rowSub: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 1,
+  },
+  emptyCard: {
+    marginTop: spacing.xs,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontFamily: font.bold,
+  },
+  emptyBody: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  ctaInner: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gold,
+    borderRadius: radius.pill,
+  },
+  ctaText: {
+    color: colors.gold,
+    fontFamily: font.bold,
+    fontSize: 14,
+  },
 });

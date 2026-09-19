@@ -1,227 +1,259 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Animated, Text, ScrollView, Dimensions, TextInput, ActivityIndicator, StyleSheet, TouchableWithoutFeedback, Keyboard, Image, TouchableOpacity } from 'react-native';
-import GlobalText from './GlobalText';
-import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import TextTicker from 'react-native-text-ticker';
-import { API_URL } from './api';
+import { LinearGradient } from 'expo-linear-gradient';
+import GlobalText from '@/lib/GlobalText';
+import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import { Glass } from '@/lib/Glass';
+import { API_URL } from '@/lib/api';
+import { apiJson } from '@/lib/session';
+import { colors, font, radius, spacing } from '@/lib/theme';
+
+const GENRES = [
+  { name: 'rap', color: '#5810E7' },
+  { name: 'pop', color: '#E75F10' },
+  { name: 'r&b', color: '#E71022' },
+  { name: 'indie', color: '#E7B510' },
+  { name: 'country', color: '#107CE7' },
+  { name: 'hip-hop', color: '#CE10E7' },
+  { name: 'rock', color: '#10E77C' },
+  { name: 'jazz', color: '#993B3B' },
+  { name: 'soul', color: '#3B6499' },
+  { name: 'metal', color: '#6D3B99' },
+  { name: 'house', color: '#E710B5' },
+  { name: 'folk', color: '#45993B' },
+];
+
+interface Rating {
+  average: number;
+  count: number;
+}
 
 const PlaceholderItem: React.FC = () => {
-    const opacity = useRef(new Animated.Value(0.3)).current;
+  const opacity = useRef(new Animated.Value(0.25)).current;
 
-    useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(opacity, {
-                    toValue: 1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 0.3,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
-    }, [opacity]);
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.25, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [opacity]);
 
-    return (
-        <Animated.View style={[styles.placeholderItem, { opacity }]}>
-            <View style={styles.placeholderThumb} />
-            <View style={styles.placeholderContent}>
-                <View style={styles.placeholderLineShort} />
-                <View style={styles.placeholderLineLong} />
-            </View>
-        </Animated.View>
-    );
+  return (
+    <Animated.View style={[styles.placeholderItem, { opacity }]}>
+      <View style={styles.placeholderThumb} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={styles.placeholderLineShort} />
+        <View style={styles.placeholderLineLong} />
+      </View>
+    </Animated.View>
+  );
 };
 
-
 export default function Trending() {
-    const router = useRouter();
-    const [searchResults, setSearchResults] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    // Fetch most popular albums
+  const router = useRouter();
+  const [albums, setAlbums] = useState<any[] | null>(null);
+  const [ratings, setRatings] = useState<Record<string, Rating>>({});
+  const [loading, setLoading] = useState(true);
+  const [showAllGenres, setShowAllGenres] = useState(false);
 
-    useEffect(() => {
-        fetch(`${API_URL}/trending_albums/`)
-            .then((r) => r.json())
-            .then((data) => setSearchResults(data))
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []);
+  useEffect(() => {
+    fetch(`${API_URL}/trending_albums/`)
+      .then((r) => r.json())
+      .then((data) => setAlbums(Array.isArray(data) ? data : []))
+      .catch(() => setAlbums([]))
+      .finally(() => setLoading(false));
+  }, []);
 
-    if (loading) {
-        return (
-            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70 }}>
-                <ScrollView style={{ padding: 20, paddingVertical: 0 }} contentContainerStyle={{ paddingBottom: 80 }}>
+  // Overlay recrd's own averages on the chart.
+  useEffect(() => {
+    if (!albums?.length) return;
+    const ids = albums.map((a) => a.id).join(',');
+    apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+      .then(setRatings)
+      .catch(() => setRatings({}));
+  }, [albums]);
 
-                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
-                        recrd
-                    </GlobalText>
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
-                        trending
-                    </GlobalText>
-                    {[...Array(5)].map((_, i) => (
-                        <PlaceholderItem key={i} />
-                    ))}
+  const visibleGenres = showAllGenres ? GENRES : GENRES.slice(0, 6);
 
+  return (
+    <Screen title="trending" subtitle="what everyone's playing right now">
+      <SectionHeader style={{ marginTop: spacing.lg }}>top albums</SectionHeader>
 
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
-                        by genre
-                    </GlobalText>
-                    <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "rap" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>rap</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "pop" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>pop</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "r&b" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>r&b</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "indie" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>indie</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "country" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>country</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "hip-hop" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>hip-hop</GlobalText>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 15 }}>
-                        <TouchableOpacity style={{ height: 30, width: 100, backgroundColor: "#1e1e1e", alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
-                            <GlobalText>view all</GlobalText>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
+      {loading ? (
+        [...Array(5)].map((_, i) => <PlaceholderItem key={i} />)
+      ) : !albums || albums.length === 0 ? (
+        <Empty>couldn't load the chart right now. pull to try again.</Empty>
+      ) : (
+        albums.map((album: any, index: number) => (
+          <Pressable
+            key={album.id}
+            style={styles.albumRow}
+            onPress={() => router.push(`/components/Album/${album.id}`)}
+          >
+            <GlobalText style={styles.rank}>{index + 1}</GlobalText>
+            <Image
+              source={
+                album.images?.length
+                  ? { uri: album.images[0].url }
+                  : require('@/assets/images/album-placeholder.png')
+              }
+              style={styles.cover}
+            />
+            <View style={{ flex: 1 }}>
+              <GlobalText style={styles.albumName} numberOfLines={1}>
+                {album.name}
+              </GlobalText>
+              <GlobalText style={styles.artistName} numberOfLines={1}>
+                {(album.artists || []).map((a: { name: string }) => a.name).join(', ')}
+              </GlobalText>
             </View>
-        );
-    }
+            {ratings[album.id] && (
+              <GlobalText style={styles.score}>{ratings[album.id].average}</GlobalText>
+            )}
+          </Pressable>
+        ))
+      )}
 
-    return (
-        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-            <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70 }}>
-                <ScrollView style={{ flex: 1, padding: 20, paddingTop: 0 }} contentContainerStyle={{ paddingBottom: 80 }}>
+      <SectionHeader
+        action={
+          <Pressable onPress={() => setShowAllGenres((v) => !v)} hitSlop={8}>
+            <GlobalText style={styles.toggle}>
+              {showAllGenres ? 'show less' : 'view all'}
+            </GlobalText>
+          </Pressable>
+        }
+      >
+        by genre
+      </SectionHeader>
 
-                    <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
-                        recrd
-                    </GlobalText>
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 20, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
-                        trending
-                    </GlobalText>
-                    {(searchResults.length > 0) ? (
-                        searchResults.map((album: any) => (
-                            <TouchableOpacity key={album.id} onPress={() => router.push(`/components/Album/${album.id}`)}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                                    <Image source={{ uri: album.images[0].url }} style={{ width: 60, height: 60 }} />
-                                    <View style={{ overflow: 'hidden', flex: 1 }}>
-                                        <TextTicker
-                                            // force it to measure full width
-                                            style={[styles.globalText, { fontFamily: 'Nunito-Bold' }]}
-                                            duration={5000}
-                                            loop
-                                            bounce={false}
-                                            repeatSpacer={50}
-                                            marqueeDelay={1000}
-                                        >
-                                            {album.name}
-                                        </TextTicker>
-
-                                        <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>
-                                            by {album.artists.map((artist: { name: string }) => artist.name).join(', ')}
-                                        </GlobalText>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <GlobalText style={{ color: '#FFFAF0A0', fontSize: 16 }}>no results found</GlobalText>
-                    )}
-
-
-                    <GlobalText style={{ color: '#FFFAF0', fontSize: 18, marginTop: 15, marginBottom: 10, fontFamily: 'Nunito-Bold' }}>
-                        by genre
-                    </GlobalText>
-                    <View style={{ flexWrap: 'wrap', flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#5810E7", marginBottom: 10 }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "rap" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>rap</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E75F10" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "pop" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>pop</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E71022" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "r&b" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>r&b</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#E7B510" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "indie" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>indie</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#107CE7" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "country" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>country</GlobalText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.genreTile, { backgroundColor: "#CE10E7" }]} onPress={() => router.push({ pathname: "/components/Genre/[genreName]", params: { genreName: "hip-hop" }, })}>
-                            <GlobalText style={{ marginTop: "auto", marginLeft: "auto", fontSize: 24, fontFamily: 'Nunito-Bold' }}>hip-hop</GlobalText>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 15 }}>
-                        <TouchableOpacity style={{ height: 30, width: 100, backgroundColor: "#1e1e1e", alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
-                            <GlobalText>view all</GlobalText>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
-            </View>
-        </TouchableWithoutFeedback>
-    );
+      <View style={styles.genreGrid}>
+        {visibleGenres.map((genre) => (
+          <Pressable
+            key={genre.name}
+            onPress={() =>
+              router.push({
+                pathname: '/components/Genre/[genreName]',
+                params: { genreName: genre.name },
+              })
+            }
+            style={({ pressed }) => [styles.genreTile, pressed && { opacity: 0.75 }]}
+          >
+            <LinearGradient
+              colors={[genre.color, `${genre.color}33`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Glass style={styles.genreSheen} cornerRadius={radius.md} tone="clear" />
+            <GlobalText style={styles.genreLabel}>{genre.name}</GlobalText>
+          </Pressable>
+        ))}
+      </View>
+    </Screen>
+  );
 }
 
 const screenWidth = Dimensions.get('window').width;
-const genreTileWidth = ((screenWidth - 40) * 0.33) - 5;
+const genreTileWidth = (screenWidth - 40 - 20) / 3;
 
 const styles = StyleSheet.create({
-    genreTile: {
-        backgroundColor: '#FFFAF0A0',
-        width: genreTileWidth,
-        height: genreTileWidth,
-        borderRadius: 10,
-        padding: 5,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    globalText: {
-        fontFamily: 'Nunito-Regular', // Global font
-        fontSize: 16,
-        color: '#FFFAF0',
-    },
-    placeholderItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    placeholderThumb: {
-        width: 60,
-        height: 60,
-        backgroundColor: '#333',
-    },
-    placeholderContent: {
-        flex: 1,
-        marginLeft: 10,
-    },
-    placeholderLineShort: {
-        width: '40%',
-        height: 14,
-        borderRadius: 2,
-        backgroundColor: '#333',
-        marginBottom: 7,
-    },
-    placeholderLineLong: {
-        width: '60%',
-        height: 12,
-        borderRadius: 2,
-        backgroundColor: '#333',
-    },
+  albumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  rank: {
+    width: 18,
+    color: colors.textFaint,
+    fontSize: 14,
+    fontFamily: font.bold,
+    textAlign: 'center',
+  },
+  cover: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
+  },
+  albumName: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.bold,
+  },
+  artistName: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 1,
+  },
+  score: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: font.bold,
+  },
+  toggle: {
+    color: colors.gold,
+    fontSize: 13,
+    fontFamily: font.bold,
+  },
+  genreGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  genreTile: {
+    width: genreTileWidth,
+    height: genreTileWidth,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    padding: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.edge,
+  },
+  genreSheen: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  genreLabel: {
+    fontSize: 17,
+    fontFamily: font.bold,
+    color: colors.text,
+    textAlign: 'right',
+  },
+  placeholderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  placeholderThumb: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
+  },
+  placeholderLineShort: {
+    width: '45%',
+    height: 13,
+    borderRadius: 4,
+    backgroundColor: colors.bgLift,
+  },
+  placeholderLineLong: {
+    width: '65%',
+    height: 11,
+    borderRadius: 4,
+    backgroundColor: colors.bgLift,
+  },
 });

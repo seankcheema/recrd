@@ -1,6 +1,7 @@
 // GlobalText.tsx
 import React from 'react';
 import { Text, TextProps, StyleSheet } from 'react-native';
+import { colors, font } from './theme';
 
 const GlobalText: React.FC<TextProps> = ({ style, children, ...props }) => {
   return (
@@ -12,9 +13,9 @@ const GlobalText: React.FC<TextProps> = ({ style, children, ...props }) => {
 
 const styles = StyleSheet.create({
   globalText: {
-    fontFamily: 'Nunito-Regular', // Global font
+    fontFamily: font.regular, // Global font
     fontSize: 16,
-    color: '#FFFAF0',
+    color: colors.text,
   },
 });
 

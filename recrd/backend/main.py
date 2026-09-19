@@ -1,8 +1,10 @@
 # recrd/backend/main.py
 
 import os
-from fastapi import FastAPI, HTTPException, Query
+import traceback
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from spotipy import Spotify, SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -10,8 +12,9 @@ from typing import Dict, Any, List
 import requests
 from io import BytesIO
 from colorthief import ColorThief
-import time
 from auth import router as auth_router
+from social import router as social_router
+import charts
 
 load_dotenv()
 CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -26,6 +29,21 @@ auth_manager = SpotifyClientCredentials(
 sp = Spotify(auth_manager=auth_manager)
 
 app = FastAPI(title="Recrd Spotify API")
+
+
+# Registered before CORSMiddleware so it sits *inside* it: an unhandled error
+# becomes a normal JSON response that CORS can then add its headers to.
+# Starlette's own 500 page skips CORS entirely, which the browser reports as
+# an opaque network failure instead of the real error.
+@app.middleware("http")
+async def catch_unhandled_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,8 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router)
-
-APPLE_TOP_ALBUMS_RSS = "https://rss.applemarketingtools.com/api/v2/us/music/most-played/{limit}/albums.json"
+app.include_router(social_router)
 
 @app.get("/songs/{song_id}")
 async def get_song(song_id: str):
@@ -138,83 +155,24 @@ async def get_album(album_id: str):
 @app.get("/trending_albums/", response_model=List[Dict[str, Any]])
 async def trending_albums(
     limit: int = Query(5, ge=1, le=20, description="How many trending albums to return"),
-    genre: str = Query(None, description="Spotify genre seed (e.g. 'pop', 'rock')")
+    genre: str = Query(None, description="Genre tile name, e.g. 'pop', 'hip-hop'")
 ) -> List[Dict[str, Any]]:
     """
-    1. Fetch the top `limit` most-played albums from Apple Music RSS.
-    2. For each album, search Spotify by album name + artist.
-    3. Collect the first Spotify match for each, batch-fetch full album objects.
-    4. Return the list of Spotify album objects.
+    Apple's top-albums chart (overall, or for a genre), resolved to Spotify
+    albums. See charts.py — results are cached, so this is cheap to poll.
     """
     try:
-        spotify_albums: List[str] = []
-        if genre:
-            # 1) Search tracks by genre
-            track_resp = sp.search(
-                q=f"genre:{genre.lower()}",
-                type="track",
-                limit=limit * 2  # over-fetch so we can dedupe
-            )
-            seen = set()
-            for t in track_resp["tracks"]["items"]:
-                alb = t.get("album", {})
-
-                if alb.get("album_type") != "album":
-                    continue
-
-                aid = alb.get("id")
-                if aid and aid not in seen:
-                    seen.add(aid)
-                    
-                    spotify_albums.append(alb)
-                    
-                    if len(spotify_albums) >= limit:
-                        break
-            
-        else:
-            rss_url = APPLE_TOP_ALBUMS_RSS.format(limit=limit * 2)
-
-            # ─── RETRY LOGIC ─────────────────────────────────────────
-            feed = []
-            max_retries = 3
-            for attempt in range(1, max_retries + 1):
-                try:
-                    resp = requests.get(rss_url, timeout=5)
-                    resp.raise_for_status()
-                    feed = resp.json().get("feed", {}).get("results", [])
-                    break
-                except requests.RequestException as e:
-                    if attempt == max_retries:
-                        # final failure → 502
-                        raise HTTPException(
-                            status_code=502,
-                            detail=f"Apple RSS fetch failed after {max_retries} attempts: {e}"
-                        )
-                    # wait before next try (2s, then 4s, …)
-                    time.sleep(2 ** attempt)
-            # ──────────────────────────────────────────────────────────
-
-            # process `feed` into spotify_albums as before
-            for item in feed:
-                name = item.get("name", "")
-                artist = item.get("artistName", "")
-                query = f"album:{name} artist:{artist}"
-                try:
-                    res = sp.search(q=query, type="album", limit=1)
-                    albums = res.get("albums", {}).get("items", [])
-                    if albums and len(spotify_albums) < limit:
-                        spotify_albums.append(albums[0])
-                except SpotifyException:
-                    continue
-
-        return spotify_albums
-
+        return charts.trending_albums(auth_manager, genre, limit)
     except requests.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Apple RSS fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Chart fetch failed: {e}")
     except SpotifyException as e:
         raise HTTPException(status_code=e.http_status or 400, detail=e.msg)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/genres/", response_model=List[str])
+async def genres() -> List[str]:
+    """Genre names that /trending_albums/ has a real chart for."""
+    return sorted(charts.GENRE_IDS.keys())
 
 
 @app.get("/search/")

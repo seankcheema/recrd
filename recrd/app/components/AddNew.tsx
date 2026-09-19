@@ -1,243 +1,274 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  Keyboard,
-  ActivityIndicator,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-} from 'react-native';
-import TextTicker from 'react-native-text-ticker';
-import GlobalText from './GlobalText';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
-import { API_URL } from './api';
+import GlobalText from '@/lib/GlobalText';
+import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import SearchField from '@/lib/SearchField';
+import { apiJson } from '@/lib/session';
+import { API_URL } from '@/lib/api';
+import { colors, font, radius, spacing } from '@/lib/theme';
+import type { PersonRow } from '@/lib/types';
+
+const RECENTS_KEY = 'recrd.recentSearches';
+const MAX_RECENTS = 8;
+
+interface SpotifyHit {
+  id: string;
+  name: string;
+  images?: { url: string }[];
+  artists?: { name: string }[];
+}
 
 export default function AddNew() {
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchResults, setSearchResults] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
-  };
-
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setSearchResults(null);
-    }
-  }, [searchQuery]);
-
-  // Debounce the fetch so we don't fire on every keystroke
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setSearchResults(null);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      performSearch();
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
-
-  const performSearch = async () => {
-    setLoading(true);
-    try {
-
-      const resp = await fetch(
-        `${API_URL}/search/?q=${encodeURIComponent(searchQuery)}&limit=5`
-      );
-      if (!resp.ok) throw new Error(`${resp.status}`);
-      const data = await resp.json();
-
-      setSearchResults(data);
-    } catch (err) {
-      console.error('Search failed:', err);
-      setSearchResults(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [albums, setAlbums] = useState<SpotifyHit[]>([]);
+  const [artists, setArtists] = useState<SpotifyHit[]>([]);
+  const [people, setPeople] = useState<PersonRow[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [recents, setRecents] = useState<string[]>([]);
 
-  const openAlbum = (id: string) => {
-    router.push({
-      pathname: '/components/Album/[albumId]',
-      params: { albumId: id },
+  // Recent searches live on the device, not the server.
+  useEffect(() => {
+    AsyncStorage.getItem(RECENTS_KEY)
+      .then((raw) => setRecents(raw ? JSON.parse(raw) : []))
+      .catch(() => setRecents([]));
+  }, []);
+
+  const rememberSearch = (term: string) => {
+    const cleaned = term.trim().toLowerCase();
+    if (cleaned.length < 2) return;
+    setRecents((prev) => {
+      const next = [cleaned, ...prev.filter((r) => r !== cleaned)].slice(0, MAX_RECENTS);
+      AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
     });
   };
 
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setSearchResults(null);
+  const clearRecents = () => {
+    setRecents([]);
+    AsyncStorage.removeItem(RECENTS_KEY).catch(() => {});
   };
 
+  // Debounce the fetch so we don't fire on every keystroke
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setAlbums([]);
+      setArtists([]);
+      setPeople([]);
+      setHasSearched(false);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const [spotify, users] = await Promise.all([
+          fetch(`${API_URL}/search/?q=${encodeURIComponent(q)}&limit=6`)
+            .then((r) => (r.ok ? r.json() : { albums: [], artists: [] }))
+            .catch(() => ({ albums: [], artists: [] })),
+          apiJson<PersonRow[]>(`/users/search?q=${encodeURIComponent(q)}&limit=4`).catch(
+            () => [] as PersonRow[]
+          ),
+        ]);
+        if (cancelled) return;
+        setAlbums(spotify.albums || []);
+        setArtists(spotify.artists || []);
+        setPeople(users);
+        setHasSearched(true);
+        rememberSearch(q);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery]);
+
   return (
-    
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70}}>
-        <ScrollView style={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 80 }}>
-          <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
-            recrd
-          </GlobalText>
+    <Screen title="add new" subtitle="rank an album you've listened to">
+      <SearchField
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="search an album or artist"
+      />
 
-          {/* Search Bar */}
-          <View style={styles.searchBarContainer}>
-            <Feather name="search" size={24} color="#FFFAF0" />
-            <TextInput
-              value={searchQuery.toLowerCase()}
-              onChangeText={handleSearchChange}
-              placeholder="search an album or artist"
-              placeholderTextColor="#FFFAF0A0"
-              style={styles.searchBar}
-              maxLength={25}
-              returnKeyType="search"
-              onSubmitEditing={performSearch}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={handleClearSearch} >
-                <Feather name="x-circle" size={20} color="#FFFAF0" />
-              </TouchableOpacity>
-            )}
-          </View>
+      {!hasSearched && !loading && (
+        <>
+          <SectionHeader
+            action={
+              recents.length > 0 ? (
+                <Pressable onPress={clearRecents} hitSlop={8}>
+                  <GlobalText style={styles.clear}>clear</GlobalText>
+                </Pressable>
+              ) : undefined
+            }
+          >
+            recent searches
+          </SectionHeader>
+          {recents.length === 0 ? (
+            <Empty>search an album or artist to add it to your list.</Empty>
+          ) : (
+            recents.map((term) => (
+              <Pressable
+                key={term}
+                style={styles.recentRow}
+                onPress={() => setSearchQuery(term)}
+              >
+                <Feather name="clock" size={16} color={colors.textFaint} />
+                <GlobalText style={styles.recentText}>{term}</GlobalText>
+                <Feather name="arrow-up-left" size={16} color={colors.textFaint} />
+              </Pressable>
+            ))
+          )}
+        </>
+      )}
 
-          {!loading && !searchResults && (
-            <View>
-              <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold'}}>
-                recent searches
-              </GlobalText>
-            </View>
+      {loading && !hasSearched && (
+        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+      )}
+
+      {hasSearched && (
+        <View>
+          <SectionHeader>albums</SectionHeader>
+          {albums.length > 0 ? (
+            albums.map((item) => (
+              <Pressable
+                key={item.id}
+                style={styles.row}
+                onPress={() => router.push(`/components/Album/${item.id}`)}
+              >
+                <Image
+                  source={
+                    item.images?.length
+                      ? { uri: item.images[0].url }
+                      : require('@/assets/images/album-placeholder.png')
+                  }
+                  style={styles.cover}
+                />
+                <View style={{ flex: 1 }}>
+                  <GlobalText style={styles.rowTitle} numberOfLines={1}>
+                    {item.name}
+                  </GlobalText>
+                  <GlobalText style={styles.rowSub} numberOfLines={1}>
+                    {(item.artists || []).map((a) => a.name).join(', ')}
+                  </GlobalText>
+                </View>
+                <Feather name="plus-circle" size={20} color={colors.gold} />
+              </Pressable>
+            ))
+          ) : (
+            <Empty>no albums found</Empty>
           )}
 
-          {loading && !searchResults && (
-            <View>
-            </View>
-          )}
-
-          {/* Results */}
-          {searchResults && (
-            <View>
-              <View style={{ marginBottom: 15 }}>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold', marginBottom: 10 }}>
-                  albums
+          <SectionHeader>artists</SectionHeader>
+          {artists.length > 0 ? (
+            artists.map((item) => (
+              <Pressable
+                key={item.id}
+                style={styles.row}
+                onPress={() => router.push(`/components/Artist/${item.id}`)}
+              >
+                <Image
+                  source={
+                    item.images?.length
+                      ? { uri: item.images[0].url }
+                      : require('@/assets/images/artist-placeholder.png')
+                  }
+                  style={styles.pfp}
+                />
+                <GlobalText style={[styles.rowTitle, { flex: 1 }]} numberOfLines={1}>
+                  {item.name}
                 </GlobalText>
-                {searchResults.albums.length > 0 ? (
-                  searchResults.albums.map((item: any) => (
-                    <TouchableOpacity key={item.id} style={styles.albumView} onPress={() => {openAlbum(item.id)}}>
-                      <Image
-                        source={
-                          item.images?.length
-                            ? { uri: item.images[0].url }
-                            : require('@/assets/images/album-placeholder.png')
-                        }
-                        style={styles.smallalbum}
-                      />
-                      <View style={{ overflow: 'hidden', flex: 1 }}>
-                        <TextTicker
-                          // force it to measure full width
-                          style={[styles.globalText, { fontFamily: 'Nunito-Bold'}]}
-                          duration={5000}
-                          loop
-                          bounce={false}
-                          repeatSpacer={50}
-                          marqueeDelay={1000}
-                        >
-                          {item.name}
-                        </TextTicker>
-
-                        <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>
-                          by {item.artists.map((artist: { name: string }) => artist.name).join(', ')}
-                        </GlobalText>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={{ color: '#888', fontStyle: 'italic' }}>no results</Text>
-                )}
-              </View>
-              <View style={{ marginBottom: 15 }}>
-                <GlobalText style={{ color: '#FFFAF0', fontSize: 18, fontFamily: 'Nunito-Bold', marginBottom: 10 }}>
-                  artists
-                </GlobalText>
-                {searchResults.artists.length > 0 ? (
-                  searchResults.artists.map((item: any) => (
-                    <TouchableOpacity key={item.id} style={styles.albumView} onPress={() => router.push(`/components/Artist/${item.id}`)}>
-                      <Image
-                        source={
-                          item.images?.length
-                            ? { uri: item.images[0].url }
-                            : require('@/assets/images/artist-placeholder.png')
-                        }
-                        style={styles.smallpfp}
-                      />
-                      <View>
-                        <GlobalText style={{ fontSize: 16, fontFamily: 'Nunito-Bold' }}>{item.name}</GlobalText>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={{ color: '#888', fontStyle: 'italic' }}>no results</Text>
-                )}
-              </View>
-            </View>
+              </Pressable>
+            ))
+          ) : (
+            <Empty>no artists found</Empty>
           )}
 
-        </ScrollView>
-      </View>
-    </TouchableWithoutFeedback>
+          {people.length > 0 && (
+            <>
+              <SectionHeader>people</SectionHeader>
+              {people.map((person) => (
+                <Pressable
+                  key={person.id}
+                  style={styles.row}
+                  onPress={() => router.push(`/components/User/${person.id}`)}
+                >
+                  <Image
+                    source={
+                      person.avatarUrl
+                        ? { uri: person.avatarUrl }
+                        : require('@/assets/images/placeholder_album.png')
+                    }
+                    style={styles.pfp}
+                  />
+                  <GlobalText style={[styles.rowTitle, { flex: 1 }]} numberOfLines={1}>
+                    {person.name}
+                  </GlobalText>
+                </Pressable>
+              ))}
+            </>
+          )}
+        </View>
+      )}
+    </Screen>
   );
 }
 
-// const screenWidth = Dimensions.get('window').width;
-// const textWidth = screenWidth - 40 - 55;
-
 const styles = StyleSheet.create({
-  searchBarContainer: {
-    height: 50,
-    borderColor: '#E7BC10',
-    borderWidth: 0.5,
-    borderRadius: 15,
-    padding: 10,
+  clear: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e1e1e',
-    marginTop: 20,
-    gap: 10,
-    marginBottom: 20,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
   },
-  searchBar: {
-    fontFamily: 'Nunito-Bold',
-    color: '#FFFAF0',
-    fontSize: 16,
+  recentText: {
     flex: 1,
+    color: colors.text,
+    fontSize: 15,
   },
-  albumView: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
-    gap: 10
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
-  smallpfp: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
+  cover: {
+    width: 50,
+    height: 50,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
   },
-  smallalbum: {
-    width: 45,
-    height: 45,
+  pfp: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgLift,
   },
-  globalText: {
-    fontFamily: 'Nunito-Regular', // Global font
-    fontSize: 16,
-    color: '#FFFAF0',
+  rowTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.bold,
+  },
+  rowSub: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 1,
   },
 });

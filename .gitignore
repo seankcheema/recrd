@@ -8,10 +8,15 @@ yarn-error.log
 .expo-shared/
 
 # Babel and Metro bundler cache
-.babelrc
-babel.config.js
-metro.config.js
 .cache/
+.metro-health-check*
+
+# spotipy's cached access token
+.cache
+
+# Python
+__pycache__/
+*.py[cod]
 
 # Android
 android/app/build/

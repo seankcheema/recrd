@@ -1,24 +1,23 @@
 // app/components/Artist/[artistId].tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Image,
   ActivityIndicator,
-  ScrollView,
-  StyleSheet,
   Dimensions,
-  TouchableWithoutFeedback,
-  TouchableOpacity,
-  Keyboard
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import GlobalText from '../GlobalText';
-import { Feather } from '@expo/vector-icons';
-import TextTicker from 'react-native-text-ticker';
-import { API_URL } from '../api';
+import { LinearGradient } from 'expo-linear-gradient';
+import GlobalText from '@/lib/GlobalText';
+import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import { API_URL } from '@/lib/api';
+import { apiJson } from '@/lib/session';
+import { colors, font, radius, spacing } from '@/lib/theme';
 
 const { width } = Dimensions.get('window');
-const COVER_SIZE = width - 80;
+const COVER_SIZE = width - 96;
 
 interface Album {
   id: string;
@@ -34,161 +33,196 @@ interface ArtistData {
   dominant_color: string;
 }
 
+interface Rating {
+  average: number;
+  count: number;
+}
+
 export default function ArtistPage() {
   const router = useRouter();
   const { artistId } = useLocalSearchParams<{ artistId: string }>();
   const [artist, setArtist] = useState<ArtistData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ratings, setRatings] = useState<Record<string, Rating>>({});
 
   useEffect(() => {
     fetch(`${API_URL}/artists/${artistId}`)
-      .then(res => res.json())
-      .then(data => setArtist(data))
+      .then((res) => res.json())
+      .then((data) => setArtist(data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [artistId]);
 
+  // Pull recrd's own average rating for each album in one batch.
+  useEffect(() => {
+    if (!artist?.albums?.length) return;
+    const ids = artist.albums.slice(0, 60).map((a) => a.id).join(',');
+    apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+      .then(setRatings)
+      .catch(() => setRatings({}));
+  }, [artist]);
+
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#111111', paddingTop: 70, paddingBottom: 100 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20, marginLeft: 10 }}>
-          <Feather name="chevron-left" size={32} color="#E7BC10" />
-        </TouchableOpacity>
-
-        <ActivityIndicator style={{ position: "absolute", top: "50%", right: "50%" }} />
-
-      </View>
+      <Screen showBack>
+        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+      </Screen>
     );
   }
+
   if (!artist) {
     return (
-      <View style={styles.center}>
-        <GlobalText>Artist not found.</GlobalText>
-      </View>
+      <Screen showBack>
+        <Empty>Artist not found.</Empty>
+      </Screen>
     );
   }
 
+  const accent = artist.dominant_color || '#000000';
+  const rankedCount = artist.albums.filter((a) => ratings[a.id]).length;
+
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <View style={styles.screen}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
-          <Feather name="chevron-left" size={32} color="#E7BC10" />
-        </TouchableOpacity>
-        <ScrollView style={{ padding: 20 }} contentContainerStyle={{ paddingBottom: 80 }}>
-          <View style={styles.coverWrapper}>
-            <View
-              style={[
-                styles.coverShadow,
-                { shadowColor: artist.dominant_color }
-              ]}
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <LinearGradient
+        colors={[`${accent}66`, `${accent}14`, colors.bg]}
+        style={styles.backdrop}
+        pointerEvents="none"
+      />
+
+      <Screen showBack>
+        <View style={styles.coverWrapper}>
+          <View style={[styles.coverShadow, { boxShadow: `0px 12px 28px ${accent}8C` }]}>
+            <Image
+              source={
+                artist.images?.length
+                  ? { uri: artist.images[0].url }
+                  : require('@/assets/images/artist-placeholder.png')
+              }
+              style={styles.coverImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+
+        <GlobalText style={styles.title}>{artist.name}</GlobalText>
+        <View style={styles.metaRow}>
+          <GlobalText style={styles.meta}>{artist.albums.length} albums</GlobalText>
+          {rankedCount > 0 && (
+            <>
+              <GlobalText style={styles.metaDot}>∙</GlobalText>
+              <GlobalText style={styles.meta}>{rankedCount} ranked on recrd</GlobalText>
+            </>
+          )}
+        </View>
+
+        <SectionHeader>albums</SectionHeader>
+        {artist.albums.map((album) => {
+          const rating = ratings[album.id];
+          return (
+            <Pressable
+              key={album.id}
+              style={styles.albumRow}
+              onPress={() => router.push(`/components/Album/${album.id}`)}
             >
               <Image
-                source={{ uri: artist.images[0]?.url }}
-                style={styles.coverImage}
-                resizeMode="cover"
+                source={
+                  album.images?.length
+                    ? { uri: album.images[0].url }
+                    : require('@/assets/images/album-placeholder.png')
+                }
+                style={styles.cover}
               />
-            </View>
-          </View>
-
-          <View style={{ paddingHorizontal: 20 }}>
-            <GlobalText style={styles.title}>{artist.name}</GlobalText>
-            
-            <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
-              <GlobalText style={{ fontSize: 12 }}>
-                {artist.albums.length}
-              </GlobalText>
-              <GlobalText style={{ fontSize: 12 }}>
-                albums
-              </GlobalText>
-            </View>
-          </View>
-
-          <GlobalText style={styles.sectionHeader}>albums</GlobalText>
-          {artist.albums.map(album => (
-            <TouchableOpacity key={album.id} onPress={() => router.push(`/components/Album/${album.id}`)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-                <Image source={{ uri: album.images[0].url }} style={{ width: 60, height: 60 }} />
-                <View style={{ overflow: 'hidden', flex: 1 }}>
-                    <TextTicker
-                        // force it to measure full width
-                        style={[styles.globalText, { fontFamily: 'Nunito-Bold' }]}
-                        duration={5000}
-                        loop
-                        bounce={false}
-                        repeatSpacer={50}
-                        marqueeDelay={1000}
-                    >
-                        {album.name}
-                    </TextTicker>
-
-                    <GlobalText style={{ fontSize: 14, color: '#FFFAF0A0' }}>
-                        insert average rating here
-                    </GlobalText>
-                </View>
-            </View>
-        </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    </TouchableWithoutFeedback>
+              <View style={{ flex: 1 }}>
+                <GlobalText style={styles.albumName} numberOfLines={1}>
+                  {album.name}
+                </GlobalText>
+                <GlobalText style={styles.albumSub} numberOfLines={1}>
+                  {rating
+                    ? `${rating.count} ${rating.count === 1 ? 'listener' : 'listeners'}`
+                    : 'not ranked yet'}
+                </GlobalText>
+              </View>
+              {rating && <GlobalText style={styles.score}>{rating.average}</GlobalText>}
+            </Pressable>
+          );
+        })}
+      </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#111111',
-    paddingTop: 70,
-    paddingBottom: 100,
-    justifyContent: 'center',
-  },
-  activity: {
+  backdrop: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 420,
   },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111111' },
-  screen: { flex: 1, backgroundColor: '#111111', paddingTop: 70 },
-  backButton: { marginLeft: 10, marginBottom: 20 },
-  scroll: { flex: 1, paddingHorizontal: 20 },
-  content: { paddingBottom: 80 },
   coverWrapper: {
     width: COVER_SIZE,
     height: COVER_SIZE,
     alignSelf: 'center',
-    marginBottom: 5,
-    marginTop: 20,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
   },
-
   coverShadow: {
     flex: 1,
-    backgroundColor: '#111111',
-    // iOS
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    // Android
-    elevation: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgLift,
+    elevation: 14,
   },
   coverImage: {
     flex: 1,
+    borderRadius: radius.pill,
   },
-  metaContainer: { paddingHorizontal: 20, marginBottom: 10 },
   title: {
-    fontFamily: 'Nunito-Bold',
-    fontSize: 20,
-    color: '#FFFAF0',
+    color: colors.text,
+    fontSize: 24,
+    fontFamily: font.bold,
+    letterSpacing: -0.4,
+    textAlign: 'center',
   },
-  sectionHeader: {
-    fontFamily: 'Nunito-Bold',
-    fontSize: 18,
-    color: '#FFFAF0',
-    marginTop: 15,
-    marginBottom: 10,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
   },
-  globalText: {
-    fontFamily: 'Nunito-Regular', // Global font
-    fontSize: 16,
-    color: '#FFFAF0',
+  meta: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  metaDot: {
+    color: colors.textFaint,
+    fontSize: 12,
+  },
+  albumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  cover: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
+  },
+  albumName: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.bold,
+  },
+  albumSub: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 1,
+  },
+  score: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: font.bold,
   },
 });
