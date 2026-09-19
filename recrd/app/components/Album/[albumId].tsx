@@ -1,7 +1,6 @@
 // app/components/Album/[albumId].tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -15,6 +14,7 @@ import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty, SectionHeader } from '@/lib/Screen';
 import TierChip from '@/lib/TierChip';
 import RankSheet from '@/lib/RankSheet';
+import { Skeleton, SkeletonHeading, SkeletonList } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
@@ -111,7 +111,15 @@ export default function AlbumPage() {
   if (loading) {
     return (
       <Screen showBack>
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+        <View style={styles.loadingCover}>
+          <Skeleton width={COVER_SIZE} height={COVER_SIZE} borderRadius={radius.md} />
+        </View>
+        <View style={styles.loadingMeta}>
+          <Skeleton width="65%" height={24} />
+          <Skeleton width="40%" height={13} />
+        </View>
+        <SkeletonHeading width={90} />
+        <SkeletonList count={5} size={40} circle />
       </Screen>
     );
   }
@@ -271,6 +279,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 420,
+  },
+  loadingCover: {
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxl,
+  },
+  loadingMeta: {
+    alignItems: 'center',
+    gap: spacing.md,
   },
   coverWrapper: {
     width: COVER_SIZE,

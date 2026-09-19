@@ -15,13 +15,24 @@ export const colors = {
   textFaint: '#FFFAF061',
   /** Hairlines and glass edges. */
   line: '#FFFAF01A',
+  /** The rule between two items in a flowing list. */
+  divider: '#FFFAF014',
   edge: '#FFFAF024',
   edgeStrong: '#FFFAF040',
   /** Glass fills, layered over whatever is behind. */
   glass: '#FFFAF00F',
   glassStrong: '#FFFAF01A',
+  /** Faint lift under a field or a row, without turning it into a card. */
+  fill: '#FFFAF00A',
   danger: '#E71022',
 } as const;
+
+/**
+ * The drop shadow under a gold button. Kept small and tight on purpose —
+ * a wide, strong one reads as a glow and makes the button look like it is
+ * floating off the page.
+ */
+export const goldGlow = '0px 2px 6px rgba(231, 188, 16, 0.18)';
 
 export const radius = {
   sm: 10,

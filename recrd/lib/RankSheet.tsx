@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,7 +18,7 @@ import GlobalText from './GlobalText';
 import { Glass } from './Glass';
 import { apiJson } from './session';
 import { TIERS, TIER_COLORS, TIER_DEFAULT_RANK, Tier, tierForRank } from './tiers';
-import { colors, font, radius, spacing } from './theme';
+import { colors, font, goldGlow, radius, spacing } from './theme';
 import type { Entry } from './types';
 
 interface Album {
@@ -87,6 +88,19 @@ export default function RankSheet({
     } finally {
       setSaving(false);
     }
+  };
+
+  const confirmRemove = () => {
+    if (!existing || saving) return;
+    // Taking an album off the list also takes its review, likes and comments.
+    Alert.alert(
+      'remove this ranking?',
+      `${existing.albumName} will come off your list, along with your review and everything on it.`,
+      [
+        { text: 'cancel', style: 'cancel' },
+        { text: 'remove', style: 'destructive', onPress: remove },
+      ]
+    );
   };
 
   const remove = async () => {
@@ -199,7 +213,7 @@ export default function RankSheet({
           </Pressable>
 
           {existing ? (
-            <Pressable onPress={remove} disabled={saving} style={{ marginTop: spacing.lg }}>
+            <Pressable onPress={confirmRemove} disabled={saving} style={{ marginTop: spacing.lg }}>
               <GlobalText style={styles.remove}>remove from my list</GlobalText>
             </Pressable>
           ) : null}
@@ -328,7 +342,7 @@ const styles = StyleSheet.create({
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 4px 14px rgba(231, 188, 16, 0.35)',
+    boxShadow: goldGlow,
   },
   buttonText: {
     fontFamily: font.bold,

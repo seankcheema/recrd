@@ -1,6 +1,6 @@
 // app/Login.tsx
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import AuthShell, { authStyles as s } from '@/lib/AuthShell';
@@ -61,6 +61,14 @@ export default function LoginPage() {
         returnKeyType="go"
       />
 
+      <Pressable
+        onPress={() => router.push('/components/ForgotPassword')}
+        hitSlop={8}
+        style={styles.forgotRow}
+      >
+        <GlobalText style={s.footerLink}>forgot password?</GlobalText>
+      </Pressable>
+
       {error ? <GlobalText style={s.error}>{error}</GlobalText> : null}
 
       <Pressable
@@ -84,3 +92,10 @@ export default function LoginPage() {
     </AuthShell>
   );
 }
+
+const styles = StyleSheet.create({
+  forgotRow: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.md,
+  },
+});

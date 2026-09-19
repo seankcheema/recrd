@@ -13,7 +13,11 @@ import { colors } from '@/lib/theme';
 // Keep splash visible until we manually hide it
 SplashScreen.preventAutoHideAsync();
 
-const AUTH_ROUTES = ['/components/Login', '/components/Signup'];
+const AUTH_ROUTES = [
+  '/components/Login',
+  '/components/Signup',
+  '/components/ForgotPassword',
+];
 
 function AppShell() {
   const { me, ready } = useAuth();
@@ -79,6 +83,10 @@ function AppShell() {
           name="components/Signup"
           options={{ gestureEnabled: false }}
         />
+        <Stack.Screen
+          name="components/ForgotPassword"
+          options={{ gestureEnabled: false }}
+        />
 
         {/* Detail pages: keep default gestures, with slide animation */}
         <Stack.Screen
@@ -107,6 +115,14 @@ function AppShell() {
         />
         <Stack.Screen
           name="components/EditProfile"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="components/Rankings/[userId]"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="components/Settings"
           options={{ animation: 'slide_from_right' }}
         />
       </Stack>

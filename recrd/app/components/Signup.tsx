@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import AuthShell, { authStyles as s } from '@/lib/AuthShell';
+import UsernameField, { UsernameState } from '@/lib/UsernameField';
 import { useAuth } from '@/lib/session';
 import { colors, spacing } from '@/lib/theme';
 
@@ -11,6 +12,8 @@ export default function SignUpPage() {
   const router = useRouter();
   const { signUp } = useAuth();
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameState, setUsernameState] = useState<UsernameState>('empty');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -21,8 +24,16 @@ export default function SignUpPage() {
   const handleSignUp = async () => {
     setError(null);
     setNotice(null);
-    if (!name.trim() || !email.trim() || !password) {
+    if (!name.trim() || !username.trim() || !email.trim() || !password) {
       setError('All fields are required.');
+      return;
+    }
+    if (username.trim().length < 3) {
+      setError('Your username needs at least 3 characters.');
+      return;
+    }
+    if (usernameState === 'taken') {
+      setError('That username is taken — pick another.');
       return;
     }
     if (password.length < 6) {
@@ -35,7 +46,7 @@ export default function SignUpPage() {
     }
     setLoading(true);
     try {
-      const { needsConfirmation } = await signUp(name, email, password);
+      const { needsConfirmation } = await signUp(name, username, email, password);
       if (needsConfirmation) {
         // Email confirmation is on for this Supabase project, so there is no
         // session yet — the account is real, it just has to be verified first.
@@ -53,7 +64,7 @@ export default function SignUpPage() {
 
   return (
     <AuthShell heading="create account" tagline="start your list">
-      <GlobalText style={s.label}>username</GlobalText>
+      <GlobalText style={s.label}>name</GlobalText>
       <TextInput
         style={s.input}
         value={name}
@@ -62,6 +73,13 @@ export default function SignUpPage() {
         placeholderTextColor={colors.textFaint}
         autoCapitalize="words"
         textContentType="name"
+      />
+
+      <GlobalText style={[s.label, { marginTop: spacing.xl }]}>username</GlobalText>
+      <UsernameField
+        value={username}
+        onChangeText={setUsername}
+        onStateChange={setUsernameState}
       />
 
       <GlobalText style={[s.label, { marginTop: spacing.xl }]}>email</GlobalText>

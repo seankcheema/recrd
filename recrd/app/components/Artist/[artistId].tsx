@@ -1,7 +1,6 @@
 // app/components/Artist/[artistId].tsx
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -12,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import { Skeleton, SkeletonHeading, SkeletonList } from '@/lib/Skeleton';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/lib/theme';
@@ -65,7 +65,15 @@ export default function ArtistPage() {
   if (loading) {
     return (
       <Screen showBack>
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+        <View style={styles.coverWrapper}>
+          <Skeleton width={COVER_SIZE} height={COVER_SIZE} borderRadius={radius.pill} />
+        </View>
+        <View style={styles.loadingMeta}>
+          <Skeleton width="55%" height={24} />
+          <Skeleton width="35%" height={12} />
+        </View>
+        <SkeletonHeading width={80} />
+        <SkeletonList count={6} />
       </Screen>
     );
   }
@@ -158,6 +166,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 420,
+  },
+  loadingMeta: {
+    alignItems: 'center',
+    gap: spacing.md,
   },
   coverWrapper: {
     width: COVER_SIZE,

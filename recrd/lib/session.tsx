@@ -17,6 +17,7 @@ const REFRESH_KEY = 'recrd.refreshToken';
 export interface Me {
   uid: string;
   name: string;
+  username: string | null;
   email: string;
   avatarUrl: string | null;
   bio: string | null;
@@ -28,11 +29,20 @@ interface AuthValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
     name: string,
+    username: string,
     email: string,
     password: string
   ) => Promise<{ needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  changePassword: (current: string, next: string) => Promise<void>;
+  /** Email a recovery code. Resolves the same way whether or not the
+   *  address has an account. */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** Spend a recovery code on a new password and sign in. */
+  resetPassword: (email: string, code: string, next: string) => Promise<void>;
+  /** Deletes the account for good, then signs out. */
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -227,11 +237,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, username: string, email: string, password: string) => {
       const resp = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+        body: JSON.stringify({
+          name: name.trim(),
+          username: username.trim().toLowerCase(),
+          email: email.trim(),
+          password,
+        }),
       });
       const data = await readJson(resp);
       if (!resp.ok) throw new Error(errorMessage(data, 'Sign up failed'));
@@ -246,9 +261,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loadMe]
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const resp = await fetch(`${API_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    if (!resp.ok) {
+      throw new Error(errorMessage(await readJson(resp), 'Could not send that email'));
+    }
+  }, []);
+
+  const resetPassword = useCallback(
+    async (email: string, code: string, next: string) => {
+      const resp = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          code: code.trim(),
+          newPassword: next,
+        }),
+      });
+      const data = await readJson(resp);
+      if (!resp.ok) throw new Error(errorMessage(data, 'Could not reset your password'));
+      await persistTokens(data.accessToken, data.refreshToken);
+      await loadMe();
+    },
+    [loadMe]
+  );
+
+  const changePassword = useCallback(async (current: string, next: string) => {
+    await apiJson('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: current, newPassword: next }),
+    });
+  }, []);
+
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      await apiJson('/auth/delete-account', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      });
+      await signOut();
+    },
+    [signOut]
+  );
+
   const value = useMemo(
-    () => ({ me, ready, signIn, signUp, signOut, refreshMe: loadMe }),
-    [me, ready, signIn, signUp, signOut, loadMe]
+    () => ({
+      me,
+      ready,
+      signIn,
+      signUp,
+      signOut,
+      refreshMe: loadMe,
+      changePassword,
+      requestPasswordReset,
+      resetPassword,
+      deleteAccount,
+    }),
+    [
+      me,
+      ready,
+      signIn,
+      signUp,
+      signOut,
+      loadMe,
+      changePassword,
+      requestPasswordReset,
+      resetPassword,
+      deleteAccount,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

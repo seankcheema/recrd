@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty, SectionHeader } from '@/lib/Screen';
 import SearchField from '@/lib/SearchField';
+import { SkeletonHeading, SkeletonList } from '@/lib/Skeleton';
 import { apiJson } from '@/lib/session';
 import { API_URL } from '@/lib/api';
 import { colors, font, radius, spacing } from '@/lib/theme';
@@ -43,6 +44,14 @@ export default function AddNew() {
     if (cleaned.length < 2) return;
     setRecents((prev) => {
       const next = [cleaned, ...prev.filter((r) => r !== cleaned)].slice(0, MAX_RECENTS);
+      AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const forgetSearch = (term: string) => {
+    setRecents((prev) => {
+      const next = prev.filter((r) => r !== term);
       AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
@@ -126,7 +135,13 @@ export default function AddNew() {
               >
                 <Feather name="clock" size={16} color={colors.textFaint} />
                 <GlobalText style={styles.recentText}>{term}</GlobalText>
-                <Feather name="arrow-up-left" size={16} color={colors.textFaint} />
+                <Pressable
+                  onPress={() => forgetSearch(term)}
+                  hitSlop={12}
+                  style={({ pressed }) => [styles.forget, pressed && { opacity: 0.5 }]}
+                >
+                  <Feather name="x" size={16} color={colors.textFaint} />
+                </Pressable>
               </Pressable>
             ))
           )}
@@ -134,7 +149,12 @@ export default function AddNew() {
       )}
 
       {loading && !hasSearched && (
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+        <>
+          <SkeletonHeading width={70} />
+          <SkeletonList count={4} size={54} />
+          <SkeletonHeading width={64} />
+          <SkeletonList count={2} size={54} circle />
+        </>
       )}
 
       {hasSearched && (
@@ -242,6 +262,11 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: 15,
+  },
+  forget: {
+    // Sits inside the row's own Pressable, so give it room of its own to
+    // catch the tap rather than refilling the search box.
+    paddingHorizontal: spacing.xs,
   },
   row: {
     flexDirection: 'row',

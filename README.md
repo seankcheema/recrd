@@ -25,6 +25,19 @@ Supabase sends a confirmation email on sign up by default; until the address is 
 the API returns no session and the app asks the user to check their inbox. Turn that off
 under **Authentication → Sign In / Providers → Confirm email** for a faster dev loop.
 
+Migrations that came after the first release live in `backend/migrations/` and are listed
+in order; `schema.sql` already includes them, so a fresh project only needs that file.
+
+### Password reset
+Reset uses a 6-digit code rather than a magic link, so it behaves the same in Expo Go as
+in a standalone build — a link would need a different redirect URL for each. Supabase's
+default **Reset Password** template only sends `{{ .ConfirmationURL }}`, so add the code
+to it under **Authentication → Emails → Reset Password**:
+
+```html
+<p>Your recrd reset code is <strong>{{ .Token }}</strong>. It expires in an hour.</p>
+```
+
 ## How to run:
 ### Back end
 1. `cd recrd/backend`
@@ -48,12 +61,18 @@ Everything below `/auth` is public; everything else needs a `Bearer` access toke
 | | |
 |---|---|
 | `POST /auth/signup` · `POST /auth/login` · `POST /auth/refresh` · `GET /auth/me` | accounts and sessions |
+| `GET /auth/username-available` | is a handle free (public, for the sign up form) |
+| `POST /auth/forgot-password` · `POST /auth/reset-password` | reset by emailed code |
+| `POST /auth/password` · `POST /auth/delete-account` | change password, delete account |
 | `GET /users/me` · `PATCH /users/me` · `GET /users/{id}` · `GET /users/search` | profiles |
+| `POST /users/me/avatar` | profile picture upload (multipart, Supabase Storage) |
 | `POST`/`DELETE /users/{id}/follow` · `GET /users/{id}/followers` · `/following` | the social graph |
 | `POST /entries` · `GET /entries/me` · `GET /users/{id}/entries` · `DELETE /entries/{id}` | rankings |
 | `POST`/`DELETE /entries/{id}/like` · `GET`/`POST /entries/{id}/comments` · `DELETE /comments/{id}` | likes and comments |
 | `GET /feed` | rankings from the people you follow, plus your own |
 | `GET`/`POST /watchlist` · `DELETE /watchlist/{albumId}` | the to-be-listened list |
+| `GET /users/{id}/watchlist` | someone else's to-be-listened list |
 | `GET /albums/{id}/social` · `GET /ratings?albumIds=` | recrd's own data for an album |
 | `GET /albums/{id}` · `GET /artists/{id}` · `GET /search/` | Spotify catalogue |
 | `GET /trending_albums/?genre=` · `GET /genres/` | charts (cached 30 min) |
+| `GET /album_genres/?albumIds=` | coarse genres per album, for list filtering (cached 24h) |

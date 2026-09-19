@@ -23,6 +23,85 @@ create table if not exists profiles (
 
 create index if not exists profiles_name_idx on profiles (lower(name));
 
+-- ── usernames ────────────────────────────────────────────────────────────
+-- `name` is the display name and repeats freely; `username` is the unique
+-- handle people are found by. Added after the fact, so existing rows are
+-- backfilled from their email before the column is made required.
+-- Also available on its own as migrations/001_usernames.sql.
+alter table profiles add column if not exists username citext;
+
+with candidates as (
+  select
+    id,
+    nullif(
+      left(regexp_replace(lower(split_part(email::text, '@', 1)), '[^a-z0-9_.]', '', 'g'), 18),
+      ''
+    ) as base
+  from profiles
+  where username is null
+),
+numbered as (
+  select
+    id,
+    coalesce(base, 'listener') as base,
+    row_number() over (partition by coalesce(base, 'listener') order by id) as n
+  from candidates
+)
+update profiles p
+set username = case when numbered.n = 1 then numbered.base
+                    else numbered.base || numbered.n::text end
+from numbered
+where p.id = numbered.id;
+
+alter table profiles alter column username set not null;
+
+create unique index if not exists profiles_username_key on profiles (username);
+
+-- Any insert that arrives without a handle gets one derived from its email.
+-- Supabase's own auth.users trigger only knows about (id, email, name), so
+-- without this a NOT NULL username breaks sign up. See
+-- migrations/002_username_default.sql.
+create or replace function public.profiles_fill_username()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  base      text;
+  candidate text;
+  n         int := 1;
+begin
+  if new.username is not null then
+    return new;
+  end if;
+
+  base := nullif(
+    left(regexp_replace(lower(split_part(coalesce(new.email::text, ''), '@', 1)),
+                        '[^a-z0-9_.]', '', 'g'), 18),
+    ''
+  );
+  base := coalesce(base, 'listener');
+  if length(base) < 3 then
+    base := left(base || 'user', 20);
+  end if;
+
+  candidate := base;
+  while exists (select 1 from public.profiles where username = candidate) loop
+    n := n + 1;
+    candidate := left(base, 20 - length(n::text)) || n::text;
+  end loop;
+
+  new.username := candidate;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_fill_username_trg on profiles;
+create trigger profiles_fill_username_trg
+  before insert on profiles
+  for each row execute function public.profiles_fill_username();
+
 -- ── album_entries: one ranking per user per album ────────────────────────
 create table if not exists album_entries (
   id               uuid primary key default gen_random_uuid(),

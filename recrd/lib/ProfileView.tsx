@@ -1,7 +1,6 @@
 // app/components/ProfileView.tsx
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -13,10 +12,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import GlobalText from './GlobalText';
 import ActivityPost from './ActivityPost';
 import Screen, { Empty, SectionHeader } from './Screen';
-import { Glass, GlassButton } from './Glass';
+import { Skeleton, SkeletonFeed, SkeletonHeading, SkeletonProfile } from './Skeleton';
 import { apiJson } from './session';
 import { colors, font, radius, spacing } from './theme';
-import type { Entry, Profile } from './types';
+import type { Entry, Profile, SavedAlbum } from './types';
 
 interface Props {
   userId: string | null;
@@ -24,28 +23,29 @@ interface Props {
   self: boolean;
   /** The tab-bar copy has nowhere to go back to; pushed copies do. */
   showBack?: boolean;
-  onSignOut?: () => void;
 }
 
-export default function ProfileView({ userId, self, showBack = false, onSignOut }: Props) {
+export default function ProfileView({ userId, self, showBack = false }: Props) {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [saved, setSaved] = useState<SavedAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAllFavorites, setShowAllFavorites] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [p, e] = await Promise.all([
+      const [p, e, w] = await Promise.all([
         apiJson<Profile>(self ? '/users/me' : `/users/${userId}`),
         apiJson<Entry[]>(`/users/${userId}/entries`),
+        apiJson<SavedAlbum[]>(`/users/${userId}/watchlist`),
       ]);
       setProfile(p);
       setEntries(e);
+      setSaved(w);
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -90,8 +90,25 @@ export default function ProfileView({ userId, self, showBack = false, onSignOut 
 
   if (loading) {
     return (
-      <Screen showBack={showBack}>
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+      <Screen
+        showBack={showBack}
+        titlePlaceholder={!showBack}
+        headerRight={self ? <View style={styles.iconButton} /> : undefined}
+      >
+        <SkeletonProfile />
+        <SkeletonHeading width={110} />
+        <View style={styles.albumGrid}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton
+              key={i}
+              width={albumTileWidth}
+              height={albumTileWidth}
+              borderRadius={radius.sm}
+            />
+          ))}
+        </View>
+        <SkeletonHeading width={80} />
+        <SkeletonFeed count={2} showAuthor={false} />
       </Screen>
     );
   }
@@ -104,19 +121,22 @@ export default function ProfileView({ userId, self, showBack = false, onSignOut 
     );
   }
 
-  // "Favorites" are simply the highest-ranked albums on the list.
-  const favorites = entries.slice(0, showAllFavorites ? 12 : 3);
+  // "Favorites" are simply the highest-ranked albums on the list; the full
+  // ranking lives behind the "full list" link.
+  const favorites = entries.slice(0, 6);
 
   return (
     <Screen
-      title={showBack ? undefined : profile.name}
+      title={profile.username ?? profile.name}
       showBack={showBack}
       headerRight={
         self ? (
-          <Pressable onPress={onSignOut} hitSlop={10}>
-            <Glass style={styles.iconButton} cornerRadius={radius.pill}>
-              <Feather name="log-out" size={18} color={colors.textMuted} />
-            </Glass>
+          <Pressable
+            onPress={() => router.push('/components/Settings')}
+            hitSlop={10}
+            style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}
+          >
+            <Feather name="settings" size={20} color={colors.textMuted} />
           </Pressable>
         ) : undefined
       }
@@ -126,132 +146,114 @@ export default function ProfileView({ userId, self, showBack = false, onSignOut 
       }}
       refreshing={refreshing}
     >
-      <Glass style={styles.card} cornerRadius={radius.lg} tone="clear">
-        <View style={styles.cardInner}>
-          <View style={styles.identityRow}>
-            <Image
-              source={
-                profile.avatarUrl
-                  ? { uri: profile.avatarUrl }
-                  : require('@/assets/images/placeholder_album.png')
-              }
-              style={styles.pfp}
-            />
-            <View style={{ flex: 1, gap: spacing.sm }}>
-              <GlobalText style={styles.name} numberOfLines={2}>
-                {profile.name}
-              </GlobalText>
-              <View style={styles.statsRow}>
-                <Pressable
-                  style={styles.stat}
-                  onPress={() =>
-                    router.push(`/components/Connections/${profile.id}?tab=followers`)
-                  }
-                >
-                  <GlobalText style={styles.statValue}>
-                    {profile.followers.toLocaleString()}
-                  </GlobalText>
-                  <GlobalText style={styles.statLabel}>followers</GlobalText>
-                </Pressable>
-                <View style={styles.statDivider} />
-                <Pressable
-                  style={styles.stat}
-                  onPress={() =>
-                    router.push(`/components/Connections/${profile.id}?tab=following`)
-                  }
-                >
-                  <GlobalText style={styles.statValue}>
-                    {profile.following.toLocaleString()}
-                  </GlobalText>
-                  <GlobalText style={styles.statLabel}>following</GlobalText>
-                </Pressable>
-                <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                  <GlobalText style={styles.statValue}>{profile.rankingCount}</GlobalText>
-                  <GlobalText style={styles.statLabel}>ranked</GlobalText>
-                </View>
+      <View style={styles.identity}>
+        <View style={styles.identityRow}>
+          <Image
+            source={
+              profile.avatarUrl
+                ? { uri: profile.avatarUrl }
+                : require('@/assets/images/placeholder_album.png')
+            }
+            style={styles.pfp}
+          />
+          <View style={{ flex: 1, gap: spacing.sm }}>
+            <GlobalText style={styles.name} numberOfLines={2}>
+              {profile.name}
+            </GlobalText>
+            <View style={styles.statsRow}>
+              <Pressable
+                style={styles.stat}
+                onPress={() =>
+                  router.push(`/components/Connections/${profile.id}?tab=followers`)
+                }
+              >
+                <GlobalText style={styles.statValue}>
+                  {profile.followers.toLocaleString()}
+                </GlobalText>
+                <GlobalText style={styles.statLabel}>followers</GlobalText>
+              </Pressable>
+              <View style={styles.statDivider} />
+              <Pressable
+                style={styles.stat}
+                onPress={() =>
+                  router.push(`/components/Connections/${profile.id}?tab=following`)
+                }
+              >
+                <GlobalText style={styles.statValue}>
+                  {profile.following.toLocaleString()}
+                </GlobalText>
+                <GlobalText style={styles.statLabel}>following</GlobalText>
+              </Pressable>
+              <View style={styles.statDivider} />
+              <View style={styles.stat}>
+                <GlobalText style={styles.statValue}>{profile.rankingCount}</GlobalText>
+                <GlobalText style={styles.statLabel}>ranked</GlobalText>
               </View>
             </View>
           </View>
+        </View>
 
-          <GlobalText style={[styles.bio, !profile.bio && { color: colors.textFaint }]}>
-            {profile.bio || (self ? 'no bio yet — add one from edit profile' : 'no bio yet')}
-          </GlobalText>
+        <GlobalText style={[styles.bio, !profile.bio && { color: colors.textFaint }]}>
+          {profile.bio || (self ? 'no bio yet — add one from edit profile' : 'no bio yet')}
+        </GlobalText>
 
-          <View style={styles.buttonRow}>
-            {self ? (
-              <>
-                <GlassButton
-                  style={{ flex: 1 }}
-                  cornerRadius={radius.md}
-                  onPress={() => router.push('/components/EditProfile')}
-                >
-                  <View style={styles.actionButton}>
-                    <Feather name="edit-2" size={14} color={colors.text} />
-                    <GlobalText style={styles.actionText}>edit profile</GlobalText>
-                  </View>
-                </GlassButton>
-                <GlassButton
-                  style={{ flex: 1 }}
-                  cornerRadius={radius.md}
-                  onPress={() => router.push('/components/AddNew')}
-                >
-                  <View style={styles.actionButton}>
-                    <Feather name="plus" size={14} color={colors.gold} />
-                    <GlobalText style={[styles.actionText, { color: colors.gold }]}>
-                      add album
-                    </GlobalText>
-                  </View>
-                </GlassButton>
-              </>
-            ) : (
+        <View style={styles.buttonRow}>
+          {self ? (
+            <>
               <Pressable
-                style={({ pressed }) => [
-                  styles.followButton,
-                  profile.isFollowing && styles.followingButton,
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={toggleFollow}
-                disabled={followBusy}
+                style={({ pressed }) => [styles.secondaryButton, pressed && { opacity: 0.7 }]}
+                onPress={() => router.push('/components/EditProfile')}
               >
-                <Feather
-                  name={profile.isFollowing ? 'check' : 'plus'}
-                  size={15}
-                  color={profile.isFollowing ? colors.text : colors.bg}
-                />
-                <GlobalText
-                  style={[
-                    styles.followText,
-                    profile.isFollowing && { color: colors.text },
-                  ]}
-                >
-                  {profile.isFollowing ? 'following' : 'follow'}
+                <Feather name="edit-2" size={14} color={colors.text} />
+                <GlobalText style={styles.actionText}>edit profile</GlobalText>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.secondaryButton, pressed && { opacity: 0.7 }]}
+                onPress={() => router.push('/components/AddNew')}
+              >
+                <Feather name="plus" size={14} color={colors.gold} />
+                <GlobalText style={[styles.actionText, { color: colors.gold }]}>
+                  add album
                 </GlobalText>
               </Pressable>
-            )}
-          </View>
-
-          {self && profile.savedCount > 0 && (
+            </>
+          ) : (
             <Pressable
-              style={styles.watchlistHint}
-              onPress={() => router.push('/components/List')}
+              style={({ pressed }) => [
+                styles.followButton,
+                profile.isFollowing && styles.followingButton,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={toggleFollow}
+              disabled={followBusy}
             >
-              <Feather name="bookmark" size={13} color={colors.gold} />
-              <GlobalText style={styles.watchlistText}>
-                {profile.savedCount} to be listened
+              <Feather
+                name={profile.isFollowing ? 'check' : 'plus'}
+                size={15}
+                color={profile.isFollowing ? colors.text : colors.bg}
+              />
+              <GlobalText
+                style={[
+                  styles.followText,
+                  profile.isFollowing && { color: colors.text },
+                ]}
+              >
+                {profile.isFollowing ? 'following' : 'follow'}
               </GlobalText>
             </Pressable>
           )}
         </View>
-      </Glass>
+
+      </View>
 
       <SectionHeader
         action={
-          entries.length > 3 ? (
-            <Pressable onPress={() => setShowAllFavorites((v) => !v)} hitSlop={8}>
-              <GlobalText style={styles.toggle}>
-                {showAllFavorites ? 'show less' : 'view all'}
-              </GlobalText>
+          entries.length > 0 ? (
+            <Pressable
+              onPress={() => router.push(`/components/Rankings/${profile.id}`)}
+              hitSlop={8}
+            >
+              <GlobalText style={styles.toggle}>full list</GlobalText>
             </Pressable>
           ) : undefined
         }
@@ -281,6 +283,53 @@ export default function ProfileView({ userId, self, showBack = false, onSignOut 
         </View>
       )}
 
+      <SectionHeader>to be listened</SectionHeader>
+
+      {saved.length === 0 ? (
+        <Empty>
+          {self
+            ? 'nothing saved. tap the bookmark on an album to come back to it later.'
+            : 'nothing saved yet'}
+        </Empty>
+      ) : (
+        saved.slice(0, 5).map((album) => (
+          <Pressable
+            key={album.albumId}
+            style={styles.savedRow}
+            onPress={() => router.push(`/components/Album/${album.albumId}`)}
+          >
+            <Image
+              source={
+                album.coverUrl
+                  ? { uri: album.coverUrl }
+                  : require('@/assets/images/album-placeholder.png')
+              }
+              style={styles.savedCover}
+            />
+            <View style={{ flex: 1 }}>
+              <GlobalText style={styles.savedName} numberOfLines={1}>
+                {album.albumName}
+              </GlobalText>
+              <GlobalText style={styles.savedArtist} numberOfLines={1}>
+                {album.artistName}
+              </GlobalText>
+            </View>
+            <Feather name="bookmark" size={16} color={colors.gold} />
+          </Pressable>
+        ))
+      )}
+
+      {saved.length > 5 && (
+        <Pressable
+          onPress={() => router.push(`/components/Rankings/${profile.id}`)}
+          hitSlop={8}
+        >
+          <GlobalText style={styles.seeMore}>
+            see all {saved.length}
+          </GlobalText>
+        </Pressable>
+      )}
+
       <SectionHeader>activity</SectionHeader>
 
       {entries.length === 0 ? (
@@ -292,6 +341,7 @@ export default function ProfileView({ userId, self, showBack = false, onSignOut 
             entry={entry}
             showAuthor={false}
             onChange={replaceEntry}
+            onChanged={load}
           />
         ))
       )}
@@ -309,11 +359,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: {
-    marginTop: spacing.xs,
-  },
-  cardInner: {
-    padding: spacing.xl,
+  identity: {
+    // Not a card — the header just sits in the page's own column.
+    paddingTop: spacing.sm,
     gap: spacing.lg,
   },
   identityRow: {
@@ -367,12 +415,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  actionButton: {
+  secondaryButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 40,
+    height: 42,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.edgeStrong,
   },
   actionText: {
     color: colors.text,
@@ -399,14 +451,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: font.bold,
   },
-  watchlistHint: {
+  savedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
-  watchlistText: {
+  savedCover: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgLift,
+  },
+  savedName: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.bold,
+  },
+  savedArtist: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 1,
+  },
+  seeMore: {
     color: colors.gold,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: font.bold,
   },
   toggle: {

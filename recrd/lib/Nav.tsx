@@ -3,7 +3,7 @@ import { useRouter, usePathname } from 'expo-router';
 import { Feather, Entypo } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass, liquidGlass } from './Glass';
-import { colors, radius } from './theme';
+import { colors, goldGlow, radius } from './theme';
 
 const TABS = [
   { route: '/', icon: 'home', lib: 'entypo' },
@@ -98,8 +98,8 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: radius.pill,
     backgroundColor: colors.gold,
-    boxShadow: '0px 4px 12px rgba(231, 188, 16, 0.5)',
-    elevation: 6,
+    boxShadow: goldGlow,
+    elevation: 2,
   },
   activeDot: {
     position: 'absolute',

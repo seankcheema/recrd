@@ -1,16 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, Pressable, Image } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import ActivityPost from '@/lib/ActivityPost';
 import Screen, { Empty, SectionHeader } from '@/lib/Screen';
 import SearchField from '@/lib/SearchField';
+import { SkeletonFeed, SkeletonList } from '@/lib/Skeleton';
 import { Glass, GlassButton } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
 import { API_URL } from '@/lib/api';
@@ -114,93 +109,105 @@ export default function Home() {
 
       {showResults ? (
         <View>
-          {searching && (
-            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
-          )}
-
-          <SectionHeader>friends</SectionHeader>
-          {people.length > 0 ? (
-            people.map((person) => (
-              <Pressable
-                key={person.id}
-                style={styles.row}
-                onPress={() => router.push(`/components/User/${person.id}`)}
-              >
-                <Image
-                  source={
-                    person.avatarUrl
-                      ? { uri: person.avatarUrl }
-                      : require('@/assets/images/placeholder_album.png')
-                  }
-                  style={styles.pfp}
-                />
-                <View style={{ flex: 1 }}>
-                  <GlobalText style={styles.rowTitle} numberOfLines={1}>
-                    {person.name}
-                  </GlobalText>
-                  {person.isFollowing && (
-                    <GlobalText style={styles.rowSub}>following</GlobalText>
-                  )}
-                </View>
-              </Pressable>
-            ))
+          {searching ? (
+            <>
+              <SectionHeader>friends</SectionHeader>
+              <SkeletonList count={2} size={42} circle />
+              <SectionHeader>albums</SectionHeader>
+              <SkeletonList count={3} size={46} />
+              <SectionHeader>artists</SectionHeader>
+              <SkeletonList count={2} size={42} circle />
+            </>
           ) : (
-            <Empty>no people found</Empty>
-          )}
+            <>
+              <SectionHeader>friends</SectionHeader>
+              {people.length > 0 ? (
+                people.map((person) => (
+                  <Pressable
+                    key={person.id}
+                    style={styles.row}
+                    onPress={() => router.push(`/components/User/${person.id}`)}
+                  >
+                    <Image
+                      source={
+                        person.avatarUrl
+                          ? { uri: person.avatarUrl }
+                          : require('@/assets/images/placeholder_album.png')
+                      }
+                      style={styles.pfp}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <GlobalText style={styles.rowTitle} numberOfLines={1}>
+                        {person.name}
+                      </GlobalText>
+                      <GlobalText style={styles.rowSub} numberOfLines={1}>
+                        {[person.username ? `@${person.username}` : null,
+                          person.isFollowing ? 'following' : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </GlobalText>
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <Empty>no people found</Empty>
+              )}
 
-          <SectionHeader>albums</SectionHeader>
-          {albums.length > 0 ? (
-            albums.map((album) => (
-              <Pressable
-                key={album.id}
-                style={styles.row}
-                onPress={() => router.push(`/components/Album/${album.id}`)}
-              >
-                <Image
-                  source={
-                    album.images?.length
-                      ? { uri: album.images[0].url }
-                      : require('@/assets/images/album-placeholder.png')
-                  }
-                  style={styles.cover}
-                />
-                <View style={{ flex: 1 }}>
-                  <GlobalText style={styles.rowTitle} numberOfLines={1}>
-                    {album.name}
-                  </GlobalText>
-                  <GlobalText style={styles.rowSub} numberOfLines={1}>
-                    {(album.artists || []).map((a) => a.name).join(', ')}
-                  </GlobalText>
-                </View>
-              </Pressable>
-            ))
-          ) : (
-            <Empty>no albums found</Empty>
-          )}
+              <SectionHeader>albums</SectionHeader>
+              {albums.length > 0 ? (
+                albums.map((album) => (
+                  <Pressable
+                    key={album.id}
+                    style={styles.row}
+                    onPress={() => router.push(`/components/Album/${album.id}`)}
+                  >
+                    <Image
+                      source={
+                        album.images?.length
+                          ? { uri: album.images[0].url }
+                          : require('@/assets/images/album-placeholder.png')
+                      }
+                      style={styles.cover}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <GlobalText style={styles.rowTitle} numberOfLines={1}>
+                        {album.name}
+                      </GlobalText>
+                      <GlobalText style={styles.rowSub} numberOfLines={1}>
+                        {(album.artists || []).map((a) => a.name).join(', ')}
+                      </GlobalText>
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <Empty>no albums found</Empty>
+              )}
 
-          <SectionHeader>artists</SectionHeader>
-          {artists.length > 0 ? (
-            artists.map((artist) => (
-              <Pressable
-                key={artist.id}
-                style={styles.row}
-                onPress={() => router.push(`/components/Artist/${artist.id}`)}
-              >
-                <Image
-                  source={
-                    artist.images?.length
-                      ? { uri: artist.images[0].url }
-                      : require('@/assets/images/artist-placeholder.png')
-                  }
-                  style={styles.pfp}
-                />
-                <GlobalText style={[styles.rowTitle, { flex: 1 }]} numberOfLines={1}>
-                  {artist.name}
-                </GlobalText>
-              </Pressable>
-            ))
-          ) : (
-            <Empty>no artists found</Empty>
+              <SectionHeader>artists</SectionHeader>
+              {artists.length > 0 ? (
+                artists.map((artist) => (
+                  <Pressable
+                    key={artist.id}
+                    style={styles.row}
+                    onPress={() => router.push(`/components/Artist/${artist.id}`)}
+                  >
+                    <Image
+                      source={
+                        artist.images?.length
+                          ? { uri: artist.images[0].url }
+                          : require('@/assets/images/artist-placeholder.png')
+                      }
+                      style={styles.pfp}
+                    />
+                    <GlobalText style={[styles.rowTitle, { flex: 1 }]} numberOfLines={1}>
+                      {artist.name}
+                    </GlobalText>
+                  </Pressable>
+                ))
+              ) : (
+                <Empty>no artists found</Empty>
+              )}
+            </>
           )}
         </View>
       ) : (
@@ -208,7 +215,7 @@ export default function Home() {
           <SectionHeader>activity</SectionHeader>
 
           {loading ? (
-            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
+            <SkeletonFeed count={3} />
           ) : error ? (
             <Empty>{error}</Empty>
           ) : feed.length === 0 ? (
@@ -230,7 +237,12 @@ export default function Home() {
             </Glass>
           ) : (
             feed.map((entry) => (
-              <ActivityPost key={entry.id} entry={entry} onChange={replaceEntry} />
+              <ActivityPost
+                key={entry.id}
+                entry={entry}
+                onChange={replaceEntry}
+                onChanged={loadFeed}
+              />
             ))
           )}
         </>

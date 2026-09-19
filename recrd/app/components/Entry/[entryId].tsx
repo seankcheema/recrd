@@ -18,15 +18,39 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalText from '@/lib/GlobalText';
 import ActivityPost from '@/lib/ActivityPost';
 import { Empty, SectionHeader } from '@/lib/Screen';
+import { Skeleton, SkeletonHeading, SkeletonPost } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
 import { relativeTime } from '@/lib/tiers';
 import { colors, font, radius, spacing, NAV_HEIGHT } from '@/lib/theme';
 import type { Comment, Entry } from '@/lib/types';
 
+/** True while the software keyboard is on screen. */
+function useKeyboardVisible() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setVisible(true)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setVisible(false)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return visible;
+}
+
 export default function EntryPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardVisible();
   const { entryId } = useLocalSearchParams<{ entryId: string }>();
   const [entry, setEntry] = useState<Entry | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -99,7 +123,6 @@ export default function EntryPage() {
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: 'padding', android: undefined })}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={insets.bottom + NAV_HEIGHT}
       >
         <ScrollView
           style={{ flex: 1 }}
@@ -108,12 +131,28 @@ export default function EntryPage() {
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
-            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+            <>
+              <SkeletonPost />
+              <SkeletonHeading width={100} />
+              {[0, 1].map((i) => (
+                <View key={i} style={styles.commentRow}>
+                  <Skeleton width={32} height={32} circle />
+                  <View style={styles.loadingBubble}>
+                    <Skeleton width="40%" height={12} />
+                    <Skeleton width="85%" height={12} />
+                  </View>
+                </View>
+              ))}
+            </>
           ) : error && !entry ? (
             <Empty>{error}</Empty>
           ) : entry ? (
             <>
-              <ActivityPost entry={entry} onChange={setEntry} />
+              <ActivityPost
+                entry={entry}
+                onChange={setEntry}
+                onChanged={(removed) => (removed ? router.back() : load())}
+              />
 
               <SectionHeader style={{ marginTop: spacing.lg }}>comments</SectionHeader>
 
@@ -162,8 +201,13 @@ export default function EntryPage() {
         </ScrollView>
 
         {entry && (
-          <View style={[styles.composerWrap, { paddingBottom: insets.bottom + NAV_HEIGHT }]}>
-            <Glass style={styles.composer} cornerRadius={radius.pill} tone="regular">
+          <View
+            style={[
+              styles.composerWrap,
+              { paddingBottom: keyboardUp ? spacing.sm : insets.bottom + NAV_HEIGHT },
+            ]}
+          >
+            <View style={styles.composer}>
               <View style={styles.composerRow}>
                 <TextInput
                   value={draft}
@@ -187,7 +231,7 @@ export default function EntryPage() {
                   )}
                 </Pressable>
               </View>
-            </Glass>
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -213,6 +257,10 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
+  },
+  loadingBubble: {
+    flex: 1,
+    gap: spacing.sm,
   },
   commentRow: {
     flexDirection: 'row',
@@ -255,6 +303,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   composer: {
+    // A solid field rather than glass — text you are typing should sit on
+    // something still.
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgLift,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.edge,
   },

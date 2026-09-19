@@ -1,16 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Dimensions,
-  Image,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty, SectionHeader } from '@/lib/Screen';
+import { SkeletonList } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
@@ -35,29 +29,6 @@ interface Rating {
   average: number;
   count: number;
 }
-
-const PlaceholderItem: React.FC = () => {
-  const opacity = useRef(new Animated.Value(0.25)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.6, duration: 800, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.25, duration: 800, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [opacity]);
-
-  return (
-    <Animated.View style={[styles.placeholderItem, { opacity }]}>
-      <View style={styles.placeholderThumb} />
-      <View style={{ flex: 1, gap: 8 }}>
-        <View style={styles.placeholderLineShort} />
-        <View style={styles.placeholderLineLong} />
-      </View>
-    </Animated.View>
-  );
-};
 
 export default function Trending() {
   const router = useRouter();
@@ -86,11 +57,11 @@ export default function Trending() {
   const visibleGenres = showAllGenres ? GENRES : GENRES.slice(0, 6);
 
   return (
-    <Screen title="trending" subtitle="what everyone's playing right now">
+    <Screen title="trending">
       <SectionHeader style={{ marginTop: spacing.lg }}>top albums</SectionHeader>
 
       {loading ? (
-        [...Array(5)].map((_, i) => <PlaceholderItem key={i} />)
+        <SkeletonList count={5} />
       ) : !albums || albums.length === 0 ? (
         <Empty>couldn't load the chart right now. pull to try again.</Empty>
       ) : (
@@ -231,29 +202,5 @@ const styles = StyleSheet.create({
     fontFamily: font.bold,
     color: colors.text,
     textAlign: 'right',
-  },
-  placeholderItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.md,
-  },
-  placeholderThumb: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.sm,
-    backgroundColor: colors.bgLift,
-  },
-  placeholderLineShort: {
-    width: '45%',
-    height: 13,
-    borderRadius: 4,
-    backgroundColor: colors.bgLift,
-  },
-  placeholderLineLong: {
-    width: '65%',
-    height: 11,
-    borderRadius: 4,
-    backgroundColor: colors.bgLift,
   },
 });

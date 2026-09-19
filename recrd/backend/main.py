@@ -1,6 +1,8 @@
 # recrd/backend/main.py
 
 import os
+import threading
+import time
 import traceback
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -124,6 +126,109 @@ def get_artist(artist_id: str):
         "albums": deduped,
         "dominant_color": dominant_color
     }
+
+# ── genres ───────────────────────────────────────────────────────────────
+# Spotify's own genres are very fine-grained ("detroit trap", "alternative
+# r&b"), which is useless as a filter, so each one is folded into the coarse
+# buckets the app already shows on the trending page. An album can land in
+# several — "pop rap" is honestly both — and filtering is happier that way
+# than with a single forced choice.
+GENRE_BUCKETS: List[tuple] = [
+    ("hip-hop", ("hip hop", "hip-hop", "rap", "trap", "drill", "grime")),
+    ("r&b",     ("r&b", "rnb", "rhythm and blues")),
+    ("soul",    ("soul", "motown", "funk")),
+    ("pop",     ("pop",)),
+    ("rock",    ("rock", "punk", "grunge", "britpop", "emo")),
+    ("metal",   ("metal", "hardcore", "thrash", "doom")),
+    ("indie",   ("indie", "alternative", "shoegaze", "lo-fi", "dream pop")),
+    ("country", ("country", "americana", "bluegrass", "honky")),
+    ("jazz",    ("jazz", "bebop", "bossa nova", "swing")),
+    ("house",   ("house", "techno", "edm", "electro", "dance", "garage", "dubstep")),
+    ("folk",    ("folk", "singer-songwriter")),
+    ("electronic", ("electronic", "ambient", "idm", "synth", "downtempo")),
+    ("latin",   ("latin", "reggaeton", "salsa", "bachata", "cumbia")),
+    ("reggae",  ("reggae", "dancehall", "ska")),
+    ("classical", ("classical", "orchestra", "baroque", "opera", "symphony")),
+    ("blues",   ("blues",)),
+]
+
+GENRE_CACHE_TTL = 24 * 60 * 60
+_genre_cache: Dict[str, tuple] = {}
+_genre_lock = threading.Lock()
+
+
+def _bucket(raw_genres) -> List[str]:
+    """Fold Spotify's genre strings into the app's coarse buckets."""
+    text = " | ".join(g.lower() for g in raw_genres)
+    return [name for name, words in GENRE_BUCKETS if any(w in text for w in words)]
+
+
+def _chunks(items: List[str], size: int):
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
+
+@app.get("/album_genres/")
+async def album_genres(
+    albumIds: str = Query(..., description="Comma-separated Spotify album ids"),
+) -> Dict[str, List[str]]:
+    """Coarse genres for a batch of albums, keyed by album id.
+
+    Spotify almost always leaves an album's own `genres` empty, so the real
+    answer comes from its artists. Both lookups are batched, and the result is
+    cached for a day because an album's genre does not move.
+    """
+    ids = [a for a in (albumIds or "").split(",") if a][:200]
+    if not ids:
+        return {}
+
+    now = time.time()
+    out: Dict[str, List[str]] = {}
+    missing: List[str] = []
+    with _genre_lock:
+        for album_id in ids:
+            hit = _genre_cache.get(album_id)
+            if hit and now - hit[0] < GENRE_CACHE_TTL:
+                out[album_id] = hit[1]
+            else:
+                missing.append(album_id)
+
+    if not missing:
+        return out
+
+    try:
+        albums = []
+        for chunk in _chunks(missing, 20):
+            albums += [a for a in (sp.albums(chunk).get("albums") or []) if a]
+
+        artist_ids = sorted(
+            {ar["id"] for a in albums for ar in (a.get("artists") or []) if ar.get("id")}
+        )
+        artist_genres: Dict[str, List[str]] = {}
+        for chunk in _chunks(artist_ids, 50):
+            for ar in sp.artists(chunk).get("artists") or []:
+                if ar:
+                    artist_genres[ar["id"]] = ar.get("genres") or []
+
+        fresh: Dict[str, List[str]] = {}
+        for a in albums:
+            raw = list(a.get("genres") or [])
+            for ar in a.get("artists") or []:
+                raw += artist_genres.get(ar.get("id"), [])
+            fresh[a["id"]] = _bucket(raw)
+    except SpotifyException as e:
+        raise HTTPException(status_code=e.http_status or 400, detail=e.msg)
+
+    with _genre_lock:
+        for album_id, buckets in fresh.items():
+            _genre_cache[album_id] = (now, buckets)
+
+    # Albums Spotify did not return get an empty list, so the client can tell
+    # "no genre" apart from "not looked up yet".
+    for album_id in missing:
+        out[album_id] = fresh.get(album_id, [])
+    return out
+
 
 @app.get("/albums/{album_id}")
 async def get_album(album_id: str):

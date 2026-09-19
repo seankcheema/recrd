@@ -3,7 +3,10 @@ import type { Tier } from './tiers';
 
 export interface Author {
   id: string;
+  /** Display name — repeats freely. */
   name: string;
+  /** Unique handle, shown as @username. Null until the migration lands. */
+  username: string | null;
   avatarUrl: string | null;
 }
 
@@ -28,6 +31,7 @@ export interface Entry {
 export interface Profile {
   id: string;
   name: string;
+  username: string | null;
   email: string | null;
   avatarUrl: string | null;
   bio: string | null;
@@ -43,6 +47,7 @@ export interface Profile {
 export interface PersonRow {
   id: string;
   name: string;
+  username: string | null;
   avatarUrl: string | null;
   bio: string | null;
   isFollowing: boolean;

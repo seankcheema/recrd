@@ -1,9 +1,10 @@
 // app/components/Connections/[userId].tsx
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty } from '@/lib/Screen';
+import { SkeletonList } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/lib/theme';
@@ -70,7 +71,7 @@ export default function ConnectionsPage() {
       </Glass>
 
       {loading ? (
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+        <SkeletonList count={6} size={44} circle />
       ) : error ? (
         <Empty>{error}</Empty>
       ) : people.length === 0 ? (
@@ -96,7 +97,11 @@ export default function ConnectionsPage() {
                 <GlobalText style={styles.name} numberOfLines={1}>
                   {person.name}
                 </GlobalText>
-                {person.bio ? (
+                {person.username ? (
+                  <GlobalText style={styles.bio} numberOfLines={1}>
+                    @{person.username}
+                  </GlobalText>
+                ) : person.bio ? (
                   <GlobalText style={styles.bio} numberOfLines={1}>
                     {person.bio}
                   </GlobalText>

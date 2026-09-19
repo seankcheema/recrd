@@ -5,9 +5,10 @@ the activity feed, follows, likes, comments and the to-be-listened list."""
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
+import usernames
 from auth import current_user_id
 from db import supabase_admin
 
@@ -16,15 +17,36 @@ router = APIRouter(tags=["social"])
 # album_entries.rank is a 1-10 score; the app shows it as a tier letter.
 TIER_BOUNDS = [(9, "S"), (7, "A"), (5, "B"), (3, "C"), (1, "D")]
 
-ENTRY_SELECT = (
-    "id, user_id, spotify_album_id, album_name, artist_name, cover_url, rank,"
-    " review, visibility, created_at,"
-    " author:profiles!album_entries_user_id_fkey(id, name, avatar_url),"
-    " likes:entry_likes(count),"
-    " comments:entry_comments(count)"
-)
+def _handle() -> str:
+    """", username" once the column exists, otherwise nothing."""
+    return ", username" if usernames.supported() else ""
 
-PROFILE_SELECT = "id, name, email, avatar_url, bio, created_at"
+
+def entry_select() -> str:
+    return (
+        "id, user_id, spotify_album_id, album_name, artist_name, cover_url, rank,"
+        " review, visibility, created_at,"
+        f" author:profiles!album_entries_user_id_fkey(id, name{_handle()}, avatar_url),"
+        " likes:entry_likes(count),"
+        " comments:entry_comments(count)"
+    )
+
+
+def profile_select() -> str:
+    return f"id, name{_handle()}, email, avatar_url, bio, created_at"
+
+# Profile pictures live in a public Supabase Storage bucket: they are shown on
+# every feed post, so a signed URL per render would be a lot of round trips
+# for something that is public anyway.
+AVATAR_BUCKET = "avatars"
+AVATAR_MAX_BYTES = 6 * 1024 * 1024
+AVATAR_TYPES = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+}
 
 
 def now_iso() -> str:
@@ -44,6 +66,7 @@ class EntryInput(BaseModel):
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=40)
+    username: Optional[str] = Field(default=None, min_length=3, max_length=20)
     bio: Optional[str] = Field(default=None, max_length=200)
     avatarUrl: Optional[str] = None
 
@@ -93,6 +116,7 @@ def shape_entry(row: Dict[str, Any], liked_ids: Optional[set] = None) -> Dict[st
         "author": {
             "id": author.get("id"),
             "name": author.get("name"),
+            "username": author.get("username"),
             "avatarUrl": author.get("avatar_url"),
         },
         "likeCount": _embedded_count(row.get("likes")),
@@ -123,6 +147,7 @@ def shape_profile(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": row["id"],
         "name": row["name"],
+        "username": row.get("username"),
         "email": row.get("email"),
         "avatarUrl": row.get("avatar_url"),
         "bio": row.get("bio"),
@@ -154,7 +179,7 @@ def following_ids(user_id: str) -> List[str]:
 def require_profile(user_id: str) -> Dict[str, Any]:
     res = (
         supabase_admin.table("profiles")
-        .select(PROFILE_SELECT)
+        .select(profile_select())
         .eq("id", user_id)
         .limit(1)
         .execute()
@@ -168,7 +193,7 @@ def profile_stats(user_id: str, viewer_id: str) -> Dict[str, Any]:
     followers = count_rows("user_follows", "following_id", user_id)
     following = count_rows("user_follows", "follower_id", user_id)
     rankings = count_rows("album_entries", "user_id", user_id)
-    saved = count_rows("saved_albums", "user_id", user_id) if viewer_id == user_id else 0
+    saved = count_rows("saved_albums", "user_id", user_id)
 
     is_following = False
     if viewer_id != user_id:
@@ -199,11 +224,16 @@ def search_users(
     limit: int = Query(10, ge=1, le=50),
     user_id: str = Depends(current_user_id),
 ):
-    """Find people by display name."""
+    """Find people by display name or handle."""
+    needle = q.strip().lstrip("@")
     res = (
         supabase_admin.table("profiles")
-        .select(PROFILE_SELECT)
-        .ilike("name", f"%{q}%")
+        .select(profile_select())
+        .or_(
+            f"name.ilike.%{needle}%,username.ilike.%{needle}%"
+            if usernames.supported()
+            else f"name.ilike.%{needle}%"
+        )
         .neq("id", user_id)
         .limit(limit)
         .execute()
@@ -227,6 +257,10 @@ def update_my_profile(data: ProfileUpdate, user_id: str = Depends(current_user_i
     patch: Dict[str, Any] = {}
     if data.name is not None:
         patch["name"] = data.name.strip()
+    if data.username is not None and usernames.supported():
+        patch["username"] = usernames.require_available(
+            usernames.normalize(data.username), except_user_id=user_id
+        )
     if data.bio is not None:
         patch["bio"] = data.bio.strip() or None
     if data.avatarUrl is not None:
@@ -238,6 +272,59 @@ def update_my_profile(data: ProfileUpdate, user_id: str = Depends(current_user_i
     patch["updated_at"] = now_iso()
     supabase_admin.table("profiles").update(patch).eq("id", user_id).execute()
     return {**shape_profile(require_profile(user_id)), **profile_stats(user_id, user_id)}
+
+
+def _ensure_avatar_bucket() -> None:
+    """Create the avatars bucket once, the first time anyone uploads."""
+    try:
+        supabase_admin.storage.get_bucket(AVATAR_BUCKET)
+    except Exception:
+        try:
+            supabase_admin.storage.create_bucket(
+                AVATAR_BUCKET,
+                options={"public": True, "file_size_limit": AVATAR_MAX_BYTES},
+            )
+        except Exception:
+            # A parallel request may have just created it; the upload below
+            # will surface the problem if it really is missing.
+            pass
+
+
+@router.post("/users/me/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...), user_id: str = Depends(current_user_id)
+):
+    """Upload a profile picture and point the profile at it."""
+    content_type = (file.content_type or "").lower()
+    extension = AVATAR_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(
+            status_code=400, detail="Pick a JPEG, PNG, WebP or HEIC image."
+        )
+
+    body = await file.read()
+    if not body:
+        raise HTTPException(status_code=400, detail="That image was empty.")
+    if len(body) > AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="That image is too large (max 6MB).")
+
+    _ensure_avatar_bucket()
+
+    # A fresh name each time, so caches and CDNs never serve the old face.
+    path = f"{user_id}/{int(datetime.now(timezone.utc).timestamp())}.{extension}"
+    try:
+        supabase_admin.storage.from_(AVATAR_BUCKET).upload(
+            path, body, {"content-type": content_type, "upsert": "true"}
+        )
+        url = supabase_admin.storage.from_(AVATAR_BUCKET).get_public_url(path)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Upload failed: {e}")
+
+    supabase_admin.table("profiles").update(
+        {"avatar_url": url, "updated_at": now_iso()}
+    ).eq("id", user_id).execute()
+
+    return {"avatarUrl": url}
 
 
 @router.get("/users/{profile_id}")
@@ -292,7 +379,7 @@ def _connection_list(rows: List[Dict[str, Any]], key: str, viewer_id: str):
 def get_followers(profile_id: str, user_id: str = Depends(current_user_id)):
     res = (
         supabase_admin.table("user_follows")
-        .select("profile:profiles!user_follows_follower_id_fkey(" + PROFILE_SELECT + ")")
+        .select("profile:profiles!user_follows_follower_id_fkey(" + profile_select() + ")")
         .eq("following_id", profile_id)
         .order("created_at", desc=True)
         .execute()
@@ -304,7 +391,7 @@ def get_followers(profile_id: str, user_id: str = Depends(current_user_id)):
 def get_following(profile_id: str, user_id: str = Depends(current_user_id)):
     res = (
         supabase_admin.table("user_follows")
-        .select("profile:profiles!user_follows_following_id_fkey(" + PROFILE_SELECT + ")")
+        .select("profile:profiles!user_follows_following_id_fkey(" + profile_select() + ")")
         .eq("follower_id", profile_id)
         .order("created_at", desc=True)
         .execute()
@@ -321,7 +408,7 @@ def get_user_entries(
     """A user's ranked albums, newest first. Private entries are owner-only."""
     query = (
         supabase_admin.table("album_entries")
-        .select(ENTRY_SELECT)
+        .select(entry_select())
         .eq("user_id", profile_id)
         .order("rank", desc=True)
         .order("created_at", desc=True)
@@ -330,6 +417,29 @@ def get_user_entries(
     if profile_id != user_id:
         query = query.eq("visibility", "public")
     return shape_entries(query.execute().data or [], user_id)
+
+
+@router.get("/users/{profile_id}/watchlist")
+def get_user_watchlist(
+    profile_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    user_id: str = Depends(current_user_id),
+):
+    """Someone's to-be-listened list, newest first.
+
+    Shown on their profile, so unlike a ranking it has no private mode — a
+    saved album is only ever "I mean to hear this".
+    """
+    require_profile(profile_id)
+    res = (
+        supabase_admin.table("saved_albums")
+        .select("*")
+        .eq("user_id", profile_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return [shape_saved(r) for r in (res.data or [])]
 
 
 # ── entries ──────────────────────────────────────────────────────────────
@@ -367,7 +477,7 @@ def upsert_entry(data: EntryInput, user_id: str = Depends(current_user_id)):
 
     res = (
         supabase_admin.table("album_entries")
-        .select(ENTRY_SELECT)
+        .select(entry_select())
         .eq("user_id", user_id)
         .eq("spotify_album_id", data.spotifyAlbumId)
         .limit(1)
@@ -380,7 +490,7 @@ def upsert_entry(data: EntryInput, user_id: str = Depends(current_user_id)):
 def get_entry(entry_id: str, user_id: str = Depends(current_user_id)):
     res = (
         supabase_admin.table("album_entries")
-        .select(ENTRY_SELECT)
+        .select(entry_select())
         .eq("id", entry_id)
         .limit(1)
         .execute()
@@ -453,7 +563,7 @@ def list_comments(entry_id: str, user_id: str = Depends(current_user_id)):
         supabase_admin.table("entry_comments")
         .select(
             "id, body, created_at, user_id,"
-            " author:profiles!entry_comments_user_id_fkey(id, name, avatar_url)"
+            f" author:profiles!entry_comments_user_id_fkey(id, name{_handle()}, avatar_url)"
         )
         .eq("entry_id", entry_id)
         .order("created_at", desc=False)
@@ -468,6 +578,7 @@ def list_comments(entry_id: str, user_id: str = Depends(current_user_id)):
             "author": {
                 "id": (r.get("author") or {}).get("id"),
                 "name": (r.get("author") or {}).get("name"),
+                "username": (r.get("author") or {}).get("username"),
                 "avatarUrl": (r.get("author") or {}).get("avatar_url"),
             },
         }
@@ -508,7 +619,7 @@ def get_feed(
     author_ids = following_ids(user_id) + [user_id]
     res = (
         supabase_admin.table("album_entries")
-        .select(ENTRY_SELECT)
+        .select(entry_select())
         .in_("user_id", author_ids)
         .eq("visibility", "public")
         .order("created_at", desc=True)
@@ -574,7 +685,7 @@ def album_social(album_id: str, user_id: str = Depends(current_user_id)):
     """Everything the album page needs on top of the Spotify payload."""
     res = (
         supabase_admin.table("album_entries")
-        .select(ENTRY_SELECT)
+        .select(entry_select())
         .eq("spotify_album_id", album_id)
         .eq("visibility", "public")
         .order("created_at", desc=True)
@@ -594,7 +705,7 @@ def album_social(album_id: str, user_id: str = Depends(current_user_id)):
         # A private entry of my own still counts as "already ranked".
         own = (
             supabase_admin.table("album_entries")
-            .select(ENTRY_SELECT)
+            .select(entry_select())
             .eq("spotify_album_id", album_id)
             .eq("user_id", user_id)
             .limit(1)

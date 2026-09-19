@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalText from './GlobalText';
+import { Skeleton } from './Skeleton';
 import { Glass } from './Glass';
 import { colors, font, radius, SCROLL_BOTTOM, spacing } from './theme';
 
@@ -21,6 +22,13 @@ interface ScreenProps {
   children: React.ReactNode;
   /** Large gold wordmark or page title. */
   title?: string;
+  /**
+   * Stand in for the title while it loads. Keeps the header — and so the
+   * safe-area inset and the height above the content — identical to the
+   * loaded screen, instead of letting the body jump down when the title
+   * arrives.
+   */
+  titlePlaceholder?: boolean;
   /** Small line under the title. */
   subtitle?: string;
   showBack?: boolean;
@@ -37,6 +45,7 @@ interface ScreenProps {
 export default function Screen({
   children,
   title,
+  titlePlaceholder = false,
   subtitle,
   showBack = false,
   headerRight,
@@ -49,7 +58,7 @@ export default function Screen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const header = (title || showBack || headerRight) && (
+  const header = (title || titlePlaceholder || showBack || headerRight) && (
     <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.xl) + spacing.sm }]}>
       {showBack && (
         <Pressable
@@ -67,6 +76,8 @@ export default function Screen({
           <GlobalText style={styles.title} numberOfLines={1}>
             {title}
           </GlobalText>
+        ) : titlePlaceholder ? (
+          <Skeleton width={150} height={30} borderRadius={8} />
         ) : null}
         {subtitle ? (
           <GlobalText style={styles.subtitle} numberOfLines={1}>
@@ -83,6 +94,10 @@ export default function Screen({
       style={styles.scroll}
       contentContainerStyle={[styles.scrollContent, contentStyle]}
       keyboardShouldPersistTaps="handled"
+      // Let the scroll view inset itself for the keyboard. A
+      // KeyboardAvoidingView *inside* a scroll view does nothing, so every
+      // form screen gets this instead.
+      automaticallyAdjustKeyboardInsets
       showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (

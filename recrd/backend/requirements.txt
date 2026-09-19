@@ -4,6 +4,7 @@ fastapi==0.115.12
 pillow>=11.3.0
 pydantic>=2.12.0
 python-dotenv==1.1.0
+python-multipart>=0.0.9
 requests==2.32.3
 spotipy==2.25.1
 supabase==2.15.1

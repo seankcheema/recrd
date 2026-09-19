@@ -1,9 +1,10 @@
 // app/components/Genre/[genreName].tsx
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty } from '@/lib/Screen';
+import { SkeletonList } from '@/lib/Skeleton';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/lib/theme';
@@ -39,7 +40,7 @@ export default function GenrePage() {
   return (
     <Screen title={genreName} subtitle="popular right now" showBack>
       {loading ? (
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xxl }} />
+        <SkeletonList count={8} />
       ) : albums.length === 0 ? (
         <Empty>no albums found for this genre.</Empty>
       ) : (
