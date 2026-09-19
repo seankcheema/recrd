@@ -54,6 +54,14 @@ export default function RootLayout() {
           name="components/Profile"
           options={{ gestureEnabled: false }}
         />
+        <Stack.Screen
+          name="components/Login"
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="components/Signup"
+          options={{ gestureEnabled: false }}
+        />
 
         {/* Detail pages: keep default gestures, with slide animation */}
         <Stack.Screen

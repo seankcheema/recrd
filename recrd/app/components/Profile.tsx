@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Dimensions, View, Text, ScrollView, TextInput, StyleSheet, Image, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
 import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
-
+    const router = useRouter();
     const handleSearchChange = (text: string) => {
         setSearchQuery(text);
     };
@@ -18,6 +19,8 @@ export default function Home() {
                     <GlobalText style={{ color: '#E7BC10', fontSize: 32, fontFamily: 'Nunito-Bold' }}>
                         username
                     </GlobalText>
+
+                    <Feather name="log-out" size={24} color="#FFFAF0" style={{ position: 'absolute', right: 20, top: 20 }} onPress={() => router.push("/components/Login")} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, width: '100%' }}>
                         <Image source={require('@/assets/images/placeholder_album.png')} style={styles.pfp} />
                         <View style={styles.profileInfo}>

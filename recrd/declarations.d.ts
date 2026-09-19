@@ -1,3 +1,5 @@
-declare module '@env' {
-    export const HOST_IP: string;
+declare namespace NodeJS {
+  interface ProcessEnv {
+    EXPO_PUBLIC_API_URL?: string;
   }
+}

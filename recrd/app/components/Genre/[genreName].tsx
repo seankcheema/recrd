@@ -15,8 +15,8 @@ import { useLocalSearchParams } from 'expo-router';    // ← useLocalSearchPara
 import GlobalText from '../GlobalText';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { HOST_IP } from '@env';
 import TextTicker from 'react-native-text-ticker';
+import { API_URL } from '../api';
 
 export default function GenrePage() {
     const router = useRouter();
@@ -26,7 +26,7 @@ export default function GenrePage() {
 
     useEffect(() => {
         
-        fetch(`http://${HOST_IP}:8000/trending_albums/?limit=10&genre=${genreName}`)
+        fetch(`${API_URL}/trending_albums/?limit=10&genre=${genreName}`)
             .then((r) => r.json())
             .then((data) => setSearchResults(data))
             .catch(console.error)

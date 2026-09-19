@@ -15,7 +15,7 @@ import { useLocalSearchParams } from 'expo-router';    // ← useLocalSearchPara
 import GlobalText from '../GlobalText';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { HOST_IP } from '@env';
+import { API_URL } from '../api';
 
 
 const { width } = Dimensions.get('window');
@@ -41,7 +41,7 @@ export default function AlbumPage() {
 
   useEffect(() => {
 
-    fetch(`http://${HOST_IP}:8000/albums/${albumId}`)
+    fetch(`${API_URL}/albums/${albumId}`)
       .then((r) => r.json())
       .then((data) => setAlbum(data))
       .catch(console.error)

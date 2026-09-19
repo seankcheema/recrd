@@ -4,10 +4,7 @@ import GlobalText from './GlobalText';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import TextTicker from 'react-native-text-ticker';
-import { HOST_IP } from '@env';
-
-
-const API_URL = `http://${HOST_IP}:8000`;
+import { API_URL } from './api';
 
 const PlaceholderItem: React.FC = () => {
     const opacity = useRef(new Animated.Value(0.3)).current;

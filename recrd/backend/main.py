@@ -2,6 +2,7 @@
 
 import os
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from spotipy import Spotify, SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -10,6 +11,7 @@ import requests
 from io import BytesIO
 from colorthief import ColorThief
 import time
+from auth import router as auth_router
 
 load_dotenv()
 CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -24,6 +26,14 @@ auth_manager = SpotifyClientCredentials(
 sp = Spotify(auth_manager=auth_manager)
 
 app = FastAPI(title="Recrd Spotify API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(auth_router)
 
 APPLE_TOP_ALBUMS_RSS = "https://rss.applemarketingtools.com/api/v2/us/music/most-played/{limit}/albums.json"
 
