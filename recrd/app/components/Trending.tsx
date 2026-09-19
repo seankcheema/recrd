@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderColor: colors.edge,
   },
   genreSheen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 0,
     backgroundColor: 'transparent',
   },

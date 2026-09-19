@@ -225,7 +225,7 @@ export default function RankSheet({
 
 const styles = StyleSheet.create({
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#00000073',
   },
   sheetWrapper: {

@@ -27,10 +27,24 @@ if [ -z "$DEVICE" ]; then
 fi
 echo "Simulator: $DEVICE"
 
-# ── make sure Expo Go is installed ───────────────────────────────────────
-if ! xcrun simctl listapps "$DEVICE" | grep -q "$EXPO_GO_ID"; then
-  echo "Expo Go not installed; fetching it..."
-  SDK=$(python3 -c 'import json;print(json.load(open("package.json"))["dependencies"]["expo"].lstrip("^~").split(".")[0])')
+# ── make sure the Expo Go matching this SDK is installed ─────────────────
+SDK=$(python3 -c 'import json;print(json.load(open("package.json"))["dependencies"]["expo"].lstrip("^~").split(".")[0])')
+
+INSTALLED=""
+if xcrun simctl listapps "$DEVICE" | grep -q "$EXPO_GO_ID"; then
+  INSTALLED=$(defaults read \
+    "$(xcrun simctl get_app_container "$DEVICE" "$EXPO_GO_ID")/Info.plist" \
+    CFBundleShortVersionString 2>/dev/null || true)
+fi
+
+# Expo Go is versioned per SDK, so a client left over from an older SDK cannot
+# open this project. Reinstall whenever its major does not match ours.
+if [ "${INSTALLED%%.*}" != "$SDK" ]; then
+  if [ -n "$INSTALLED" ]; then
+    echo "Expo Go $INSTALLED is for SDK ${INSTALLED%%.*}; fetching the SDK $SDK client..."
+  else
+    echo "Expo Go not installed; fetching the SDK $SDK client..."
+  fi
   URL=$(curl -fsSL https://api.expo.dev/v2/versions/latest \
     | python3 -c "import sys,json;d=json.load(sys.stdin)['data'];print(d['sdkVersions']['${SDK}.0.0']['iosClientUrl'])")
   TMP=$(mktemp -d)
@@ -40,7 +54,7 @@ if ! xcrun simctl listapps "$DEVICE" | grep -q "$EXPO_GO_ID"; then
   tar -xzf "$TMP/expogo.tar.gz" -C "$TMP/Expo Go.app"
   xcrun simctl install "$DEVICE" "$TMP/Expo Go.app"
   rm -rf "$TMP"
-  echo "Expo Go installed."
+  echo "Expo Go for SDK $SDK installed."
 fi
 
 # ── start Metro if it is not already up ──────────────────────────────────

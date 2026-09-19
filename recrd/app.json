@@ -8,7 +8,6 @@
     "scheme": "recrd",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0B0C",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.recrd.app"
@@ -42,7 +41,9 @@
         {
           "photosPermission": "recrd uses your photos so you can set a profile picture."
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
