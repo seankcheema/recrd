@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import Screen, { Empty } from '@/lib/Screen';
 import RankingsView from '@/lib/RankingsView';
+import SearchField from '@/lib/SearchField';
 import { Skeleton, SkeletonList } from '@/lib/Skeleton';
 import { apiJson, useAuth } from '@/lib/session';
 import { TIERS } from '@/lib/tiers';
@@ -22,6 +23,8 @@ export default function RankingsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lives up here so the field can stay pinned in the header.
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -56,12 +59,18 @@ export default function RankingsPage() {
         load();
       }}
       refreshing={refreshing}
+      belowHeader={
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder={self ? 'search your list' : 'search this list'}
+        />
+      }
     >
       {loading ? (
         <View>
-          <Skeleton width="100%" height={48} borderRadius={radius.md} />
-          {TIERS.slice(0, 3).map((tier) => (
-            <View key={tier} style={{ marginTop: spacing.xl }}>
+          {TIERS.slice(0, 3).map((tier, i) => (
+            <View key={tier} style={{ marginTop: i === 0 ? 0 : spacing.xl }}>
               <View style={styles.tierHeader}>
                 <Skeleton width={78} height={26} borderRadius={radius.sm} />
                 <View style={styles.tierRule} />
@@ -78,7 +87,8 @@ export default function RankingsPage() {
           saved={saved}
           owner={self}
           onChanged={load}
-          searchPlaceholder={self ? 'search your list' : 'search this list'}
+          query={query}
+          onQueryChange={setQuery}
           emptyState={<Empty>{self ? "you haven't ranked anything yet" : 'nothing ranked yet'}</Empty>}
         />
       )}

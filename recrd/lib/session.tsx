@@ -87,11 +87,16 @@ async function tryRefresh(): Promise<boolean> {
  * once and replays the request; if that fails the user is signed out.
  */
 export async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  // FormData carries its own multipart content type, boundary and all.
+  // Forcing JSON onto it leaves the server with a body it cannot parse, so
+  // uploads have to be left alone here.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+
   const send = () =>
     fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...(init.headers || {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },

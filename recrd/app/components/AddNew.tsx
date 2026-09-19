@@ -104,16 +104,21 @@ export default function AddNew() {
   }, [searchQuery]);
 
   return (
-    <Screen title="add new" subtitle="rank an album you've listened to">
-      <SearchField
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="search an album or artist"
-      />
-
+    <Screen
+      title="add new"
+      subtitle="rank an album you've listened to"
+      belowHeader={
+        <SearchField
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="search an album or artist"
+        />
+      }
+    >
       {!hasSearched && !loading && (
         <>
           <SectionHeader
+            first
             action={
               recents.length > 0 ? (
                 <Pressable onPress={clearRecents} hitSlop={8}>
@@ -150,7 +155,7 @@ export default function AddNew() {
 
       {loading && !hasSearched && (
         <>
-          <SkeletonHeading width={70} />
+          <SkeletonHeading width={70} first />
           <SkeletonList count={4} size={54} />
           <SkeletonHeading width={64} />
           <SkeletonList count={2} size={54} circle />
@@ -159,7 +164,7 @@ export default function AddNew() {
 
       {hasSearched && (
         <View>
-          <SectionHeader>albums</SectionHeader>
+          <SectionHeader first>albums</SectionHeader>
           {albums.length > 0 ? (
             albums.map((item) => (
               <Pressable

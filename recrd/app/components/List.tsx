@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import GlobalText from '@/lib/GlobalText';
 import Screen, { Empty } from '@/lib/Screen';
 import RankingsView from '@/lib/RankingsView';
+import SearchField from '@/lib/SearchField';
 import { Skeleton, SkeletonList } from '@/lib/Skeleton';
 import { GlassButton } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
@@ -18,6 +19,9 @@ export default function List() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Held here rather than inside RankingsView, so the field can sit in the
+  // header and stay put while the list scrolls under it.
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -50,12 +54,18 @@ export default function List() {
         load();
       }}
       refreshing={refreshing}
+      belowHeader={
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="search your list"
+        />
+      }
     >
       {loading ? (
         <View>
-          <Skeleton width="100%" height={48} borderRadius={radius.md} />
-          {TIERS.slice(0, 3).map((tier) => (
-            <View key={tier} style={{ marginTop: spacing.xl }}>
+          {TIERS.slice(0, 3).map((tier, i) => (
+            <View key={tier} style={{ marginTop: i === 0 ? 0 : spacing.xl }}>
               <View style={styles.tierHeader}>
                 <Skeleton width={78} height={26} borderRadius={radius.sm} />
                 <View style={styles.tierRule} />
@@ -72,7 +82,8 @@ export default function List() {
           saved={saved}
           owner
           onChanged={load}
-          searchPlaceholder="search your list"
+          query={query}
+          onQueryChange={setQuery}
           emptyState={
             <View style={styles.emptyCard}>
               <GlobalText style={styles.emptyTitle}>no rankings yet</GlobalText>

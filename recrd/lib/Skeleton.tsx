@@ -87,9 +87,16 @@ export function Skeleton({
  * Carries the same margins as the real one, so a loading screen leaves the
  * same gap above its first rows and nothing shifts when the content lands.
  */
-export function SkeletonHeading({ width = 90 }: { width?: number }) {
+export function SkeletonHeading({
+  width = 90,
+  first = false,
+}: {
+  width?: number;
+  /** Matches SectionHeader's own `first`. */
+  first?: boolean;
+}) {
   return (
-    <View style={styles.heading}>
+    <View style={[styles.heading, first && { marginTop: 0 }]}>
       <Skeleton width={width} height={19} />
     </View>
   );

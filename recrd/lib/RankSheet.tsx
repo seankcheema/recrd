@@ -1,9 +1,12 @@
 // app/components/RankSheet.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Modal,
   Platform,
   Pressable,
@@ -39,6 +42,9 @@ interface Props {
   onDeleted?: (entryId: string) => void;
 }
 
+/** Until the sheet has been measured, assume a typical height to slide from. */
+const FALLBACK_SHEET_HEIGHT = 460;
+
 export default function RankSheet({
   visible,
   album,
@@ -49,11 +55,45 @@ export default function RankSheet({
   onDeleted,
 }: Props) {
   const insets = useSafeAreaInsets();
+  // The modal outlives `visible` by one animation, so the sheet can play its
+  // way out instead of vanishing.
+  const [mounted, setMounted] = useState(visible);
+  const anim = useRef(new Animated.Value(0)).current;
+  const [sheetHeight, setSheetHeight] = useState(FALLBACK_SHEET_HEIGHT);
   const [tier, setTier] = useState<Tier>('B');
   const [review, setReview] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal's own "slide" carries the backdrop up with the sheet, so the blur
+  // and scrim appeared to be sliding in from the bottom too. Driving the two
+  // apart lets the backdrop settle in from behind while the sheet travels.
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [visible, anim]);
+
+  const onSheetLayout = (e: LayoutChangeEvent) => {
+    const height = e.nativeEvent.layout.height;
+    if (height > 0) setSheetHeight(height);
+  };
 
   // Re-seed the form each time the sheet opens.
   useEffect(() => {
@@ -119,105 +159,133 @@ export default function RankSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-        <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.scrim} />
-      </Pressable>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
+      {/* Stays where it is and fades up behind the sheet. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+          <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.scrim} />
+        </Pressable>
+      </Animated.View>
 
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: 'padding', android: undefined })}
         style={styles.sheetWrapper}
         pointerEvents="box-none"
       >
-        <Glass
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}
-          cornerRadius={radius.xl}
-          tone="regular"
-          tint={accent ? `${accent}1F` : undefined}
+        <Animated.View
+          onLayout={onSheetLayout}
+          style={{
+            // Fading with the slide also hides the first frame, before the
+            // real sheet height has been measured.
+            opacity: anim,
+            transform: [
+              {
+                translateY: anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [sheetHeight, 0],
+                }),
+              },
+              // A touch of depth, so it reads as coming forward rather than
+              // just up.
+              {
+                scale: anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.96, 1],
+                }),
+              },
+            ],
+          }}
         >
-          <View style={styles.grabber} />
-
-          <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
-              <GlobalText style={styles.title}>
-                {existing ? 'edit ranking' : 'rank this album'}
-              </GlobalText>
-              <GlobalText style={styles.subtitle} numberOfLines={1}>
-                {album?.name}
-              </GlobalText>
-            </View>
-            <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
-              <Feather name="x" size={20} color={colors.textMuted} />
-            </Pressable>
-          </View>
-
-          <View style={styles.tierRow}>
-            {TIERS.map((t) => {
-              const active = tier === t;
-              return (
-                <Pressable
-                  key={t}
-                  onPress={() => setTier(t)}
-                  style={({ pressed }) => [
-                    styles.tierButton,
-                    { backgroundColor: TIER_COLORS[t] },
-                    active ? styles.tierButtonActive : styles.tierButtonIdle,
-                    pressed && { opacity: 0.8 },
-                  ]}
-                >
-                  <GlobalText style={styles.tierLetter}>{t}</GlobalText>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <GlobalText style={styles.label}>review (optional)</GlobalText>
-          <TextInput
-            value={review}
-            onChangeText={setReview}
-            placeholder="what did you think?"
-            placeholderTextColor={colors.textFaint}
-            style={styles.input}
-            multiline
-            maxLength={500}
-          />
-
-          <Pressable style={styles.privacyRow} onPress={() => setIsPrivate((p) => !p)}>
-            <Feather
-              name={isPrivate ? 'lock' : 'globe'}
-              size={16}
-              color={isPrivate ? colors.gold : colors.textMuted}
-            />
-            <GlobalText
-              style={[styles.privacyText, isPrivate && { color: colors.gold }]}
-            >
-              {isPrivate ? 'only me' : 'visible to everyone'}
-            </GlobalText>
-          </Pressable>
-
-          {error ? <GlobalText style={styles.error}>{error}</GlobalText> : null}
-
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}
-            onPress={save}
-            disabled={saving}
+          <Glass
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}
+            cornerRadius={radius.xl}
+            tone="regular"
+            tint={accent ? `${accent}1F` : undefined}
           >
-            {saving ? (
-              <ActivityIndicator color={colors.bg} />
-            ) : (
-              <GlobalText style={styles.buttonText}>
-                {existing ? 'save changes' : 'add to my list'}
-              </GlobalText>
-            )}
-          </Pressable>
+            <View style={styles.grabber} />
 
-          {existing ? (
-            <Pressable onPress={confirmRemove} disabled={saving} style={{ marginTop: spacing.lg }}>
-              <GlobalText style={styles.remove}>remove from my list</GlobalText>
+            <View style={styles.titleRow}>
+              <View style={{ flex: 1 }}>
+                <GlobalText style={styles.title}>
+                  {existing ? 'edit ranking' : 'rank this album'}
+                </GlobalText>
+                <GlobalText style={styles.subtitle} numberOfLines={1}>
+                  {album?.name}
+                </GlobalText>
+              </View>
+              <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
+                <Feather name="x" size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <View style={styles.tierRow}>
+              {TIERS.map((t) => {
+                const active = tier === t;
+                return (
+                  <Pressable
+                    key={t}
+                    onPress={() => setTier(t)}
+                    style={({ pressed }) => [
+                      styles.tierButton,
+                      { backgroundColor: TIER_COLORS[t] },
+                      active ? styles.tierButtonActive : styles.tierButtonIdle,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <GlobalText style={styles.tierLetter}>{t}</GlobalText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <GlobalText style={styles.label}>review (optional)</GlobalText>
+            <TextInput
+              value={review}
+              onChangeText={setReview}
+              placeholder="what did you think?"
+              placeholderTextColor={colors.textFaint}
+              style={styles.input}
+              multiline
+              maxLength={500}
+            />
+
+            <Pressable style={styles.privacyRow} onPress={() => setIsPrivate((p) => !p)}>
+              <Feather
+                name={isPrivate ? 'lock' : 'globe'}
+                size={16}
+                color={isPrivate ? colors.gold : colors.textMuted}
+              />
+              <GlobalText
+                style={[styles.privacyText, isPrivate && { color: colors.gold }]}
+              >
+                {isPrivate ? 'only me' : 'visible to everyone'}
+              </GlobalText>
             </Pressable>
-          ) : null}
-        </Glass>
+
+            {error ? <GlobalText style={styles.error}>{error}</GlobalText> : null}
+
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}
+              onPress={save}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color={colors.bg} />
+              ) : (
+                <GlobalText style={styles.buttonText}>
+                  {existing ? 'save changes' : 'add to my list'}
+                </GlobalText>
+              )}
+            </Pressable>
+
+            {existing ? (
+              <Pressable onPress={confirmRemove} disabled={saving} style={{ marginTop: spacing.lg }}>
+                <GlobalText style={styles.remove}>remove from my list</GlobalText>
+              </Pressable>
+            ) : null}
+          </Glass>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

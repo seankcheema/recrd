@@ -100,18 +100,19 @@ export default function Home() {
         loadFeed();
       }}
       refreshing={refreshing}
+      belowHeader={
+        <SearchField
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="album, artist, or friend"
+        />
+      }
     >
-      <SearchField
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="album, artist, or friend"
-      />
-
       {showResults ? (
         <View>
           {searching ? (
             <>
-              <SectionHeader>friends</SectionHeader>
+              <SectionHeader first>friends</SectionHeader>
               <SkeletonList count={2} size={42} circle />
               <SectionHeader>albums</SectionHeader>
               <SkeletonList count={3} size={46} />
@@ -120,7 +121,7 @@ export default function Home() {
             </>
           ) : (
             <>
-              <SectionHeader>friends</SectionHeader>
+              <SectionHeader first>friends</SectionHeader>
               {people.length > 0 ? (
                 people.map((person) => (
                   <Pressable
@@ -212,7 +213,7 @@ export default function Home() {
         </View>
       ) : (
         <>
-          <SectionHeader>activity</SectionHeader>
+          <SectionHeader first>activity</SectionHeader>
 
           {loading ? (
             <SkeletonFeed count={3} />

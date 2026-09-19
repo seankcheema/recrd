@@ -21,6 +21,13 @@ interface Props {
   searchPlaceholder?: string;
   /** Your own list: every row can be re-ranked or taken off. */
   owner?: boolean;
+  /**
+   * Search text held by the caller, for pages that pin the field in their
+   * header instead. Given one, this view filters but draws no field of its
+   * own.
+   */
+  query?: string;
+  onQueryChange?: (query: string) => void;
   /** Called after a row is re-ranked or removed, so the list can reload. */
   onChanged?: () => void;
 }
@@ -39,9 +46,13 @@ export default function RankingsView({
   searchPlaceholder = 'search this list',
   owner = false,
   onChanged,
+  query: controlledQuery,
+  onQueryChange,
 }: Props) {
   const router = useRouter();
-  const [query, setQuery] = useState('');
+  const [ownQuery, setOwnQuery] = useState('');
+  const pinned = controlledQuery !== undefined;
+  const query = pinned ? controlledQuery : ownQuery;
   const [genre, setGenre] = useState<string | null>(null);
   const [editing, setEditing] = useState<Entry | null>(null);
 
@@ -79,6 +90,11 @@ export default function RankingsView({
   );
 
   const filtering = Boolean(q || genre);
+  const showChips = availableGenres.length > 1;
+  // While filtering, an empty tier is just noise.
+  const shownTiers = TIERS.filter(
+    (tier) => !filtering || visible.some((e) => e.tier === tier)
+  );
 
   if (entries.length === 0 && !(saved || []).length && emptyState) {
     return <>{emptyState}</>;
@@ -86,13 +102,21 @@ export default function RankingsView({
 
   return (
     <View>
-      <SearchField value={query} onChangeText={setQuery} placeholder={searchPlaceholder} />
+      {pinned ? null : (
+        <SearchField
+          value={query}
+          onChangeText={onQueryChange ?? setOwnQuery}
+          placeholder={searchPlaceholder}
+        />
+      )}
 
-      {availableGenres.length > 1 && (
+      {showChips && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.chipScroll}
+          // A pinned field leaves its own gap above these; a field drawn
+          // here does not.
+          style={[styles.chipScroll, pinned && styles.chipScrollTight]}
           contentContainerStyle={styles.chipRow}
         >
           <Chip label="all" active={genre === null} onPress={() => setGenre(null)} />
@@ -111,13 +135,14 @@ export default function RankingsView({
         <Empty>nothing here matches that.</Empty>
       )}
 
-      {TIERS.map((tier) => {
+      {shownTiers.map((tier, i) => {
         const tierEntries = visible.filter((e) => e.tier === tier);
-        // While filtering, an empty tier is just noise.
-        if (filtering && tierEntries.length === 0) return null;
+        // Nothing above the first tier to be separated from, once the search
+        // field has moved up into the header.
+        const opensPage = pinned && !showChips && i === 0;
 
         return (
-          <View key={tier} style={{ marginTop: spacing.xl }}>
+          <View key={tier} style={{ marginTop: opensPage ? 0 : spacing.xl }}>
             <View style={styles.tierHeader}>
               <View style={[styles.tierBadge, { backgroundColor: TIER_COLORS[tier] }]}>
                 <GlobalText style={styles.tierLabel}>{tier}-Tier</GlobalText>
@@ -259,6 +284,9 @@ function Chip({
 }
 
 const styles = StyleSheet.create({
+  chipScrollTight: {
+    marginTop: 0,
+  },
   chipScroll: {
     marginTop: spacing.md,
     // Let the row bleed to both edges of the screen while it scrolls.
