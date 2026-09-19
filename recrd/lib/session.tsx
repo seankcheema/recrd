@@ -98,6 +98,38 @@ export async function authFetch(path: string, init: RequestInit = {}): Promise<R
   return resp;
 }
 
+/**
+ * Turn FastAPI's `detail` into something worth showing a person.
+ *
+ * It is a string for our own HTTPExceptions but a list of
+ * `{loc, msg, type}` objects for request-validation failures, which stringify
+ * to "[object Object]" if handed straight to Error().
+ */
+export function errorMessage(data: any, fallback: string): string {
+  const detail = data?.detail;
+  if (typeof detail === 'string' && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : null;
+        const msg = item?.msg;
+        if (!msg) return null;
+        return field && field !== 'body' ? `${field}: ${msg}` : msg;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join('\n');
+  }
+
+  if (detail && typeof detail === 'object') {
+    const msg = (detail as any).msg ?? (detail as any).message;
+    if (typeof msg === 'string') return msg;
+  }
+
+  return fallback;
+}
+
 /** authFetch + JSON parsing + error messages lifted out of FastAPI's `detail`. */
 export async function apiJson<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const resp = await authFetch(path, init);
@@ -112,12 +144,18 @@ export async function apiJson<T = any>(path: string, init: RequestInit = {}): Pr
   }
 
   if (!resp.ok) {
-    const detail = data?.detail;
-    if (typeof detail === 'string') throw new Error(detail);
-    if (detail) throw new Error(JSON.stringify(detail));
-    throw new Error(`request failed (${resp.status})`);
+    throw new Error(errorMessage(data, `request failed (${resp.status})`));
   }
   return data as T;
+}
+
+async function readJson(resp: Response): Promise<any> {
+  const text = await resp.text();
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -180,8 +218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.detail || 'Login failed');
+      const data = await readJson(resp);
+      if (!resp.ok) throw new Error(errorMessage(data, 'Login failed'));
       await persistTokens(data.accessToken, data.refreshToken);
       await loadMe();
     },
@@ -195,8 +233,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.detail || 'Sign up failed');
+      const data = await readJson(resp);
+      if (!resp.ok) throw new Error(errorMessage(data, 'Sign up failed'));
 
       // Supabase only hands back a session when email confirmation is off.
       if (!data.accessToken) return { needsConfirmation: true };
