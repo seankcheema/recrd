@@ -169,6 +169,10 @@ export function SkeletonPost({ showAuthor = true }: { showAuthor?: boolean }) {
       <View style={styles.actions}>
         <Skeleton width={20} height={20} circle />
         <Skeleton width={20} height={20} circle />
+        {/* Standing in for the timestamp at the end of that row. */}
+        {!showAuthor && (
+          <Skeleton width={30} height={12} style={{ marginLeft: 'auto' }} />
+        )}
       </View>
     </View>
   );

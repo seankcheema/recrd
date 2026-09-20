@@ -17,7 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalText from '@/lib/GlobalText';
 import ActivityPost from '@/lib/ActivityPost';
-import { BAR_TAIL, Empty, FloatingBar, SectionHeader } from '@/lib/Screen';
+import { Empty, FloatingBar, SectionHeader } from '@/lib/Screen';
 import { Skeleton, SkeletonHeading, SkeletonPost } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
@@ -58,7 +58,7 @@ export default function EntryPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // How much of the top the floating back bar covers.
+  // How much of the top the floating back bar covers, blur falloff included.
   const [barHeight, setBarHeight] = useState(0);
 
   const load = useCallback(async () => {
@@ -120,8 +120,8 @@ export default function EntryPage() {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[styles.content, { paddingTop: barHeight + BAR_TAIL }]}
-          scrollIndicatorInsets={{ top: barHeight + BAR_TAIL }}
+          contentContainerStyle={[styles.content, { paddingTop: barHeight }]}
+          scrollIndicatorInsets={{ top: barHeight }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -163,7 +163,7 @@ export default function EntryPage() {
                         source={
                           comment.author.avatarUrl
                             ? { uri: comment.author.avatarUrl }
-                            : require('@/assets/images/placeholder_album.png')
+                            : require('@/assets/images/artist-placeholder.png')
                         }
                         style={styles.pfp}
                       />
@@ -232,17 +232,21 @@ export default function EntryPage() {
       </KeyboardAvoidingView>
 
       {/* Floats over the thread, which stays visible through it. */}
-      <FloatingBar onHeightChange={setBarHeight}>
-        <View
-          style={[styles.header, { paddingTop: Math.max(insets.top, spacing.xl) + spacing.sm }]}
-        >
-          <Pressable onPress={() => router.back()} hitSlop={10}>
-            <Glass style={styles.backGlass} cornerRadius={radius.pill}>
-              <Feather name="chevron-left" size={22} color={colors.gold} />
-            </Glass>
-          </Pressable>
-        </View>
-      </FloatingBar>
+      <FloatingBar
+        onInsetChange={setBarHeight}
+        solid={
+          <>
+            <View style={{ height: Math.max(insets.top, spacing.xl) + spacing.sm }} />
+            <View style={styles.header}>
+              <Pressable onPress={() => router.back()} hitSlop={10}>
+                <Glass style={styles.backGlass} cornerRadius={radius.pill}>
+                  <Feather name="chevron-left" size={22} color={colors.gold} />
+                </Glass>
+              </Pressable>
+            </View>
+          </>
+        }
+      />
     </View>
   );
 }

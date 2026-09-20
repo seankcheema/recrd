@@ -41,6 +41,13 @@ class SignUpInput(BaseModel):
     username: str = Field(min_length=3, max_length=20)
     email: EmailStr
     password: str = Field(min_length=6)
+    # Where the confirmation email should send them when they tap the link.
+    # The app passes its own deep link, because the project's Site URL is a
+    # localhost address that only exists on the machine running the server —
+    # tapping that on a phone goes nowhere. Supabase only honours addresses
+    # on its own redirect allow-list, so this cannot send anyone anywhere
+    # the project has not already approved.
+    redirectTo: Optional[str] = Field(default=None, max_length=500)
 
 
 class LoginInput(BaseModel):
@@ -139,12 +146,33 @@ def signup(data: SignUpInput):
         if usernames.supported()
         else None
     )
+    options: dict = {"data": {"name": name}}
+    if data.redirectTo:
+        options["email_redirect_to"] = data.redirectTo
+
+    # Supabase answers a duplicate sign-up as though it worked, so nobody can
+    # probe it for who has an account. That leaves the profile insert below to
+    # fail on a unique email instead, as raw database output. Asking first
+    # means we can say something a person can act on.
+    existing = (
+        supabase_admin.table("profiles")
+        .select("id")
+        .eq("email", data.email)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That email already has an account — log in instead.",
+        )
+
     try:
         auth_response = supabase_auth.auth.sign_up(
             {
                 "email": data.email,
                 "password": data.password,
-                "options": {"data": {"name": name}},
+                "options": options,
             }
         )
     except Exception as e:
@@ -158,7 +186,21 @@ def signup(data: SignUpInput):
     profile_row = {"id": auth_response.user.id, "name": name, "email": data.email}
     if username:
         profile_row["username"] = username
-    supabase_admin.table("profiles").upsert(profile_row, on_conflict="id").execute()
+    try:
+        supabase_admin.table("profiles").upsert(profile_row, on_conflict="id").execute()
+    except Exception as e:
+        # Two people signing up at once can still race past the check above.
+        # Either way, what comes back from the driver is not for reading.
+        text = str(e)
+        if "duplicate key" in text or "profiles_email_key" in text:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That email already has an account — log in instead.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not finish creating your account. Try again.",
+        )
 
     session = auth_response.session
     return {

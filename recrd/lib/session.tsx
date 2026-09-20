@@ -1,5 +1,6 @@
 // app/components/session.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { File, UploadType } from 'expo-file-system';
 import React, {
   createContext,
   useCallback,
@@ -9,7 +10,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import * as Linking from 'expo-linking';
 import { API_URL } from './api';
+import { clearCache } from './cache';
 
 const ACCESS_KEY = 'recrd.accessToken';
 const REFRESH_KEY = 'recrd.refreshToken';
@@ -114,15 +117,71 @@ export async function authFetch(path: string, init: RequestInit = {}): Promise<R
 }
 
 /**
+ * Upload a local file to the API, with the bearer token attached.
+ *
+ * Not authFetch: expo's fetch replaces the global one and its FormData takes
+ * only strings and blobs, so React Native's `{ uri }` file part — the usual
+ * way to upload from a picker — dies on the way out as "Unsupported
+ * FormDataPart implementation". The native uploader takes the file straight
+ * off disk instead, which also keeps a large photo out of JS memory.
+ */
+export async function authUpload(
+  path: string,
+  fileUri: string,
+  { mimeType, fieldName = 'file' }: { mimeType?: string; fieldName?: string } = {}
+): Promise<any> {
+  const send = () =>
+    new File(fileUri).upload(`${API_URL}${path}`, {
+      httpMethod: 'POST',
+      uploadType: UploadType.MULTIPART,
+      fieldName,
+      mimeType,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+
+  let result = await send();
+  if (result.status === 401 || result.status === 403) {
+    if (await tryRefresh()) {
+      result = await send();
+    } else {
+      onUnauthorized?.();
+    }
+  }
+
+  let data: any = null;
+  try {
+    data = result.body ? JSON.parse(result.body) : null;
+  } catch {
+    data = null;
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(errorMessage(data, `upload failed (${result.status})`));
+  }
+  return data;
+}
+
+/**
  * Turn FastAPI's `detail` into something worth showing a person.
  *
  * It is a string for our own HTTPExceptions but a list of
  * `{loc, msg, type}` objects for request-validation failures, which stringify
  * to "[object Object]" if handed straight to Error().
  */
+/** True for a string that is really a serialised object or array. */
+function looksLikeRawData(text: string): boolean {
+  const trimmed = text.trim();
+  return /^[[{]/.test(trimmed) || trimmed.startsWith("{'");
+}
+
 export function errorMessage(data: any, fallback: string): string {
   const detail = data?.detail;
-  if (typeof detail === 'string' && detail.trim()) return detail;
+  // A failure deep in the server can arrive as whatever the driver printed —
+  // a dict of constraint names and hints. That is not something to show
+  // somebody who was only trying to sign up.
+  if (typeof detail === 'string' && detail.trim()) {
+    return looksLikeRawData(detail) ? fallback : detail;
+  }
 
   if (Array.isArray(detail)) {
     const parts = detail
@@ -200,6 +259,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await persistTokens(null, null);
+    // Nothing of this account is left for whoever signs in next.
+    clearCache();
     if (mounted.current) setMe(null);
   }, []);
 
@@ -207,6 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     onUnauthorized = () => {
       persistTokens(null, null);
+      clearCache();
       if (mounted.current) setMe(null);
     };
     (async () => {
@@ -251,6 +313,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           username: username.trim().toLowerCase(),
           email: email.trim(),
           password,
+          // Whatever address this copy of the app answers to: a recrd:// link
+          // in a build, an exp:// one in Expo Go. Either opens the app from
+          // the phone's mail client, which a localhost link cannot.
+          redirectTo: Linking.createURL('/components/Login'),
         }),
       });
       const data = await readJson(resp);

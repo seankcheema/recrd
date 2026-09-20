@@ -7,6 +7,7 @@ import Screen, { Empty } from '@/lib/Screen';
 import { SkeletonList } from '@/lib/Skeleton';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
+import { cached, peekCached } from '@/lib/cache';
 import { colors, font, radius, spacing } from '@/lib/theme';
 
 interface Rating {
@@ -17,14 +18,21 @@ interface Rating {
 export default function GenrePage() {
   const router = useRouter();
   const { genreName } = useLocalSearchParams<{ genreName: string }>();
-  const [loading, setLoading] = useState(true);
-  const [albums, setAlbums] = useState<any[]>([]);
-  const [ratings, setRatings] = useState<Record<string, Rating>>({});
+  // Held from the last visit, so stepping back into a genre is instant.
+  const held = peekCached<any[]>(`genre:${genreName}`);
+  const [loading, setLoading] = useState(held === null);
+  const [albums, setAlbums] = useState<any[]>(held ?? []);
+  const [ratings, setRatings] = useState<Record<string, Rating>>(
+    () => peekCached<Record<string, Rating>>(`genre:${genreName}:ratings`) ?? {}
+  );
 
   useEffect(() => {
-    fetch(`${API_URL}/trending_albums/?limit=10&genre=${encodeURIComponent(genreName)}`)
-      .then((r) => r.json())
-      .then((data) => setAlbums(Array.isArray(data) ? data : []))
+    cached<any[]>(`genre:${genreName}`, () =>
+      fetch(`${API_URL}/trending_albums/?limit=10&genre=${encodeURIComponent(genreName)}`)
+        .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : []))
+    )
+      .then(setAlbums)
       .catch(() => setAlbums([]))
       .finally(() => setLoading(false));
   }, [genreName]);
@@ -32,10 +40,12 @@ export default function GenrePage() {
   useEffect(() => {
     if (!albums.length) return;
     const ids = albums.map((a) => a.id).join(',');
-    apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    cached<Record<string, Rating>>(`genre:${genreName}:ratings`, () =>
+      apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    )
       .then(setRatings)
       .catch(() => setRatings({}));
-  }, [albums]);
+  }, [albums, genreName]);
 
   return (
     <Screen title={genreName} subtitle="popular right now" showBack>

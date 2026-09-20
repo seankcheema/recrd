@@ -233,7 +233,7 @@ export default function AddNew() {
                     source={
                       person.avatarUrl
                         ? { uri: person.avatarUrl }
-                        : require('@/assets/images/placeholder_album.png')
+                        : require('@/assets/images/artist-placeholder.png')
                     }
                     style={styles.pfp}
                   />

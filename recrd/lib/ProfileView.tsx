@@ -14,6 +14,7 @@ import ActivityPost from './ActivityPost';
 import Screen, { Empty, SectionHeader } from './Screen';
 import { Skeleton, SkeletonFeed, SkeletonHeading, SkeletonProfile } from './Skeleton';
 import { apiJson } from './session';
+import { peekCached, storeCached } from './cache';
 import { colors, font, radius, spacing } from './theme';
 import type { Entry, Profile, SavedAlbum } from './types';
 
@@ -25,12 +26,22 @@ interface Props {
   showBack?: boolean;
 }
 
+/** Everything a profile page shows, held together under one key. */
+interface ProfileSnapshot {
+  profile: Profile;
+  entries: Entry[];
+  saved: SavedAlbum[];
+}
+
 export default function ProfileView({ userId, self, showBack = false }: Props) {
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [saved, setSaved] = useState<SavedAlbum[]>([]);
-  const [loading, setLoading] = useState(true);
+  // What this profile looked like last time. It is reloaded on focus either
+  // way, so this only decides whether you wait on a skeleton to see it.
+  const held = peekCached<ProfileSnapshot>(`profile:${userId}`);
+  const [profile, setProfile] = useState<Profile | null>(held?.profile ?? null);
+  const [entries, setEntries] = useState<Entry[]>(held?.entries ?? []);
+  const [saved, setSaved] = useState<SavedAlbum[]>(held?.saved ?? []);
+  const [loading, setLoading] = useState(held === null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
@@ -46,6 +57,7 @@ export default function ProfileView({ userId, self, showBack = false }: Props) {
       setProfile(p);
       setEntries(e);
       setSaved(w);
+      storeCached(`profile:${userId}`, { profile: p, entries: e, saved: w });
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -113,7 +125,10 @@ export default function ProfileView({ userId, self, showBack = false }: Props) {
     );
   }
 
-  if (error || !profile) {
+  // An error only takes the screen when there is nothing to show instead. A
+  // refresh that fails behind a profile you are already reading is not worth
+  // throwing that profile away for.
+  if (!profile) {
     return (
       <Screen showBack={showBack}>
         <Empty>{error || 'Profile not found.'}</Empty>
@@ -152,7 +167,7 @@ export default function ProfileView({ userId, self, showBack = false }: Props) {
             source={
               profile.avatarUrl
                 ? { uri: profile.avatarUrl }
-                : require('@/assets/images/placeholder_album.png')
+                : require('@/assets/images/artist-placeholder.png')
             }
             style={styles.pfp}
           />
@@ -330,7 +345,7 @@ export default function ProfileView({ userId, self, showBack = false }: Props) {
         </Pressable>
       )}
 
-      <SectionHeader>activity</SectionHeader>
+      <SectionHeader style={styles.activityHeader}>activity</SectionHeader>
 
       {entries.length === 0 ? (
         <Empty>no activity yet</Empty>
@@ -353,6 +368,13 @@ const screenWidth = Dimensions.get('window').width;
 const albumTileWidth = (screenWidth - 40 - 20) / 3;
 
 const styles = StyleSheet.create({
+  activityHeader: {
+    // A post carries its own top padding, which the album grid and the saved
+    // rows below their headings do not. Trimming the heading's gap by that
+    // much leaves the same distance under "activity" as under every other
+    // title on the page.
+    marginBottom: spacing.md - spacing.lg,
+  },
   iconButton: {
     width: 38,
     height: 38,

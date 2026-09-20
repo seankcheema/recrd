@@ -14,6 +14,7 @@ import Screen, { Empty, SectionHeader } from '@/lib/Screen';
 import { Skeleton, SkeletonHeading, SkeletonList } from '@/lib/Skeleton';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
+import { cached, LONG_TTL_MS, peekCached } from '@/lib/cache';
 import { colors, font, radius, spacing } from '@/lib/theme';
 
 const { width } = Dimensions.get('window');
@@ -41,13 +42,21 @@ interface Rating {
 export default function ArtistPage() {
   const router = useRouter();
   const { artistId } = useLocalSearchParams<{ artistId: string }>();
-  const [artist, setArtist] = useState<ArtistData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [ratings, setRatings] = useState<Record<string, Rating>>({});
+  // An artist's name, picture and back catalogue keep from one visit to the
+  // next; their ratings are ours and can move, so those get a short life.
+  const held = peekCached<ArtistData>(`artist:${artistId}`);
+  const [artist, setArtist] = useState<ArtistData | null>(held);
+  const [loading, setLoading] = useState(held === null);
+  const [ratings, setRatings] = useState<Record<string, Rating>>(
+    () => peekCached<Record<string, Rating>>(`artist:${artistId}:ratings`) ?? {}
+  );
 
   useEffect(() => {
-    fetch(`${API_URL}/artists/${artistId}`)
-      .then((res) => res.json())
+    cached<ArtistData>(
+      `artist:${artistId}`,
+      () => fetch(`${API_URL}/artists/${artistId}`).then((res) => res.json()),
+      LONG_TTL_MS
+    )
       .then((data) => setArtist(data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -57,10 +66,12 @@ export default function ArtistPage() {
   useEffect(() => {
     if (!artist?.albums?.length) return;
     const ids = artist.albums.slice(0, 60).map((a) => a.id).join(',');
-    apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    cached<Record<string, Rating>>(`artist:${artistId}:ratings`, () =>
+      apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    )
       .then(setRatings)
       .catch(() => setRatings({}));
-  }, [artist]);
+  }, [artist, artistId]);
 
   if (loading) {
     return (

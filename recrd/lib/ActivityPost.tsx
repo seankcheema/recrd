@@ -73,7 +73,7 @@ export default function ActivityPost({
             source={
               entry.author.avatarUrl
                 ? { uri: entry.author.avatarUrl }
-                : require('@/assets/images/placeholder_album.png')
+                : require('@/assets/images/artist-placeholder.png')
             }
             style={styles.pfp}
           />
@@ -136,11 +136,25 @@ export default function ActivityPost({
           )}
         </Pressable>
 
+        {/* On a profile the author line is redundant — it is all one person
+            — but the time it carried is not. It rides along at the end of
+            this row rather than taking a line of its own. */}
+        {!showAuthor && (
+          <GlobalText style={styles.actionTime}>
+            {relativeTime(entry.createdAt)}
+          </GlobalText>
+        )}
+
         {mine && (
           <Pressable
             onPress={() => setEditing(true)}
             hitSlop={8}
-            style={({ pressed }) => [styles.edit, pressed && { opacity: 0.6 }]}
+            // The timestamp already pushed everything right when it is
+            // there; two claims on the same gap would split it.
+            style={({ pressed }) => [
+              showAuthor && styles.edit,
+              pressed && { opacity: 0.6 },
+            ]}
           >
             <Feather name="more-horizontal" size={20} color={colors.textMuted} />
           </Pressable>
@@ -247,6 +261,11 @@ const styles = StyleSheet.create({
     fontFamily: font.bold,
   },
   edit: {
+    marginLeft: 'auto',
+  },
+  actionTime: {
+    color: colors.textFaint,
+    fontSize: 12,
     marginLeft: 'auto',
   },
 });

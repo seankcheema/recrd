@@ -8,21 +8,24 @@ import { SkeletonList } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
+import { cached, peekCached } from '@/lib/cache';
 import { colors, font, radius, spacing } from '@/lib/theme';
 
+// One tile per chart. Apple files rap under hip-hop and soul under r&b, so
+// tiles for those were two doors into the same list.
 const GENRES = [
-  { name: 'rap', color: '#5810E7' },
+  { name: 'hip-hop', color: '#5810E7' },
   { name: 'pop', color: '#E75F10' },
   { name: 'r&b', color: '#E71022' },
   { name: 'indie', color: '#E7B510' },
   { name: 'country', color: '#107CE7' },
-  { name: 'hip-hop', color: '#CE10E7' },
   { name: 'rock', color: '#10E77C' },
+  { name: 'latin', color: '#CE10E7' },
+  { name: 'electronic', color: '#E710B5' },
   { name: 'jazz', color: '#993B3B' },
-  { name: 'soul', color: '#3B6499' },
   { name: 'metal', color: '#6D3B99' },
-  { name: 'house', color: '#E710B5' },
   { name: 'folk', color: '#45993B' },
+  { name: 'k-pop', color: '#3B6499' },
 ];
 
 interface Rating {
@@ -30,17 +33,28 @@ interface Rating {
   count: number;
 }
 
+const CHART_KEY = 'trending';
+const RATINGS_KEY = 'trending:ratings';
+
 export default function Trending() {
   const router = useRouter();
-  const [albums, setAlbums] = useState<any[] | null>(null);
-  const [ratings, setRatings] = useState<Record<string, Rating>>({});
-  const [loading, setLoading] = useState(true);
+  // Coming back to the tab should show the chart it was showing, not a
+  // skeleton and another round of requests.
+  const held = peekCached<any[]>(CHART_KEY);
+  const [albums, setAlbums] = useState<any[] | null>(held);
+  const [ratings, setRatings] = useState<Record<string, Rating>>(
+    () => peekCached<Record<string, Rating>>(RATINGS_KEY) ?? {}
+  );
+  const [loading, setLoading] = useState(held === null);
   const [showAllGenres, setShowAllGenres] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/trending_albums/`)
-      .then((r) => r.json())
-      .then((data) => setAlbums(Array.isArray(data) ? data : []))
+    cached<any[]>(CHART_KEY, () =>
+      fetch(`${API_URL}/trending_albums/`)
+        .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : []))
+    )
+      .then(setAlbums)
       .catch(() => setAlbums([]))
       .finally(() => setLoading(false));
   }, []);
@@ -49,7 +63,9 @@ export default function Trending() {
   useEffect(() => {
     if (!albums?.length) return;
     const ids = albums.map((a) => a.id).join(',');
-    apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    cached<Record<string, Rating>>(RATINGS_KEY, () =>
+      apiJson<Record<string, Rating>>(`/ratings?albumIds=${encodeURIComponent(ids)}`)
+    )
       .then(setRatings)
       .catch(() => setRatings({}));
   }, [albums]);

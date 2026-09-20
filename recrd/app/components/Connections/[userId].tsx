@@ -89,7 +89,7 @@ export default function ConnectionsPage() {
                 source={
                   person.avatarUrl
                     ? { uri: person.avatarUrl }
-                    : require('@/assets/images/placeholder_album.png')
+                    : require('@/assets/images/artist-placeholder.png')
                 }
                 style={styles.pfp}
               />

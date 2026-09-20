@@ -8,15 +8,20 @@ import SearchField from '@/lib/SearchField';
 import { Skeleton, SkeletonList } from '@/lib/Skeleton';
 import { GlassButton } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
+import { peekCached, storeCached } from '@/lib/cache';
 import { TIERS } from '@/lib/tiers';
 import { colors, font, radius, spacing } from '@/lib/theme';
-import type { Entry, SavedAlbum } from '@/lib/types';
+import type { Entry } from '@/lib/types';
+
+const LIST_KEY = 'list:entries';
 
 export default function List() {
   const router = useRouter();
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [saved, setSaved] = useState<SavedAlbum[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Your own rankings, as last loaded. They reload on every visit anyway, so
+  // there is no reason to stare at a skeleton while that happens.
+  const held = peekCached<Entry[]>(LIST_KEY);
+  const [entries, setEntries] = useState<Entry[]>(held ?? []);
+  const [loading, setLoading] = useState(held === null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Held here rather than inside RankingsView, so the field can sit in the
@@ -25,12 +30,9 @@ export default function List() {
 
   const load = useCallback(async () => {
     try {
-      const [mine, watchlist] = await Promise.all([
-        apiJson<Entry[]>('/entries/me'),
-        apiJson<SavedAlbum[]>('/watchlist'),
-      ]);
-      setEntries(mine);
-      setSaved(watchlist);
+      const rows = await apiJson<Entry[]>('/entries/me');
+      setEntries(rows);
+      storeCached(LIST_KEY, rows);
       setError(null);
     } catch (e: any) {
       setError(e.message);
@@ -74,12 +76,11 @@ export default function List() {
             </View>
           ))}
         </View>
-      ) : error ? (
+      ) : error && entries.length === 0 ? (
         <Empty>{error}</Empty>
       ) : (
         <RankingsView
           entries={entries}
-          saved={saved}
           owner
           onChanged={load}
           query={query}

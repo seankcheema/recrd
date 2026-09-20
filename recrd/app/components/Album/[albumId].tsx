@@ -18,6 +18,7 @@ import { Skeleton, SkeletonHeading, SkeletonList } from '@/lib/Skeleton';
 import { Glass } from '@/lib/Glass';
 import { API_URL } from '@/lib/api';
 import { apiJson } from '@/lib/session';
+import { cached, LONG_TTL_MS } from '@/lib/cache';
 import { relativeTime } from '@/lib/tiers';
 import { colors, font, radius, spacing } from '@/lib/theme';
 import type { Entry } from '@/lib/types';
@@ -59,6 +60,10 @@ export default function AlbumPage() {
   const [album, setAlbum] = useState<AlbumData | null>(null);
   const [loading, setLoading] = useState(true);
   const [social, setSocial] = useState<AlbumSocial>(EMPTY_SOCIAL);
+  // Your ranking, the bookmark and the scores all ride on the social payload,
+  // so the skeleton has to wait for it too — otherwise the page lands without
+  // them and they drop in afterwards.
+  const [socialReady, setSocialReady] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
 
@@ -67,12 +72,21 @@ export default function AlbumPage() {
       setSocial(await apiJson<AlbumSocial>(`/albums/${albumId}/social`));
     } catch {
       setSocial(EMPTY_SOCIAL);
+    } finally {
+      // Only ever true: a reload after ranking or bookmarking must not throw
+      // the page back to a skeleton.
+      setSocialReady(true);
     }
   }, [albumId]);
 
+  // The album itself — tracks, artwork, cover colour — is the same every
+  // time. Only the social half below is worth asking about again.
   useEffect(() => {
-    fetch(`${API_URL}/albums/${albumId}`)
-      .then((r) => r.json())
+    cached<AlbumData>(
+      `album:${albumId}`,
+      () => fetch(`${API_URL}/albums/${albumId}`).then((r) => r.json()),
+      LONG_TTL_MS
+    )
       .then((data) => setAlbum(data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -83,7 +97,8 @@ export default function AlbumPage() {
   }, [loadSocial]);
 
   const toggleBookmark = async () => {
-    if (!album || savingBookmark) return;
+    // Ranking it already took it off the list; there is nothing to save.
+    if (!album || savingBookmark || social.myEntry) return;
     setSavingBookmark(true);
     const next = !social.saved;
     setSocial((s) => ({ ...s, saved: next }));
@@ -108,35 +123,16 @@ export default function AlbumPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Screen showBack>
-        <View style={styles.loadingCover}>
-          <Skeleton width={COVER_SIZE} height={COVER_SIZE} borderRadius={radius.md} />
-        </View>
-        <View style={styles.loadingMeta}>
-          <Skeleton width="65%" height={24} />
-          <Skeleton width="40%" height={13} />
-        </View>
-        <SkeletonHeading width={90} />
-        <SkeletonList count={5} size={40} circle />
-      </Screen>
-    );
-  }
-
-  if (!album) {
-    return (
-      <Screen showBack>
-        <Empty>Album not found.</Empty>
-      </Screen>
-    );
-  }
-
-  const totalMs = album.tracks.items.reduce((sum, t) => sum + t.duration_ms, 0);
+  // The page renders the same way throughout — one <Screen>, measured once —
+  // and only its contents change. Swapping the whole tree for a skeleton and
+  // back made the header remeasure, which shifted the page under it.
+  const ready = !loading && socialReady;
+  const totalMs = album?.tracks.items.reduce((sum, t) => sum + t.duration_ms, 0) ?? 0;
   const minutes = Math.floor(totalMs / 60000);
-  const releaseYear = album.release_date.split('-')[0];
-  const artistNames = album.artists.map((a) => a.name).join(', ');
-  const accent = album.dominant_color || '#000000';
+  const releaseYear = album?.release_date.split('-')[0] ?? '';
+  // Until the cover is in, there is no colour to wash the page with.
+  const accent = album?.dominant_color || '#000000';
+  const artistNames = album ? album.artists.map((a) => a.name).join(', ') : '';
 
   const rankingRow = (entry: Entry) => (
     <Pressable
@@ -148,7 +144,7 @@ export default function AlbumPage() {
         source={
           entry.author.avatarUrl
             ? { uri: entry.author.avatarUrl }
-            : require('@/assets/images/placeholder_album.png')
+            : require('@/assets/images/artist-placeholder.png')
         }
         style={styles.pfp}
       />
@@ -178,96 +174,122 @@ export default function AlbumPage() {
       />
 
       <Screen showBack>
-        <View style={styles.coverWrapper}>
-          <View style={[styles.coverShadow, { boxShadow: `0px 12px 28px ${accent}8C` }]}>
-            <Image
-              source={
-                album.images?.length
-                  ? { uri: album.images[0].url }
-                  : require('@/assets/images/album-placeholder.png')
-              }
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
+        {!ready ? (
+          <>
+            <View style={styles.loadingCover}>
+              <Skeleton width={COVER_SIZE} height={COVER_SIZE} borderRadius={radius.md} />
+            </View>
+            <View style={styles.loadingMeta}>
+              <Skeleton width="65%" height={24} />
+              <Skeleton width="40%" height={13} />
+            </View>
+            <SkeletonHeading width={90} />
+            <SkeletonList count={5} size={40} circle />
+          </>
+        ) : !album ? (
+          <Empty>Album not found.</Empty>
+        ) : (
+          <>
+          <View style={styles.coverWrapper}>
+            <View style={[styles.coverShadow, { boxShadow: `0px 12px 28px ${accent}8C` }]}>
+              <Image
+                source={
+                  album.images?.length
+                    ? { uri: album.images[0].url }
+                    : require('@/assets/images/album-placeholder.png')
+                }
+                style={styles.coverImage}
+                resizeMode="cover"
+              />
+            </View>
+
+            <Glass style={styles.albumActions} cornerRadius={radius.pill} tone="regular">
+              <View style={styles.actionsRow}>
+                <Pressable onPress={() => setSheetOpen(true)} hitSlop={6} style={styles.action}>
+                  <Feather
+                    name={social.myEntry ? 'check-circle' : 'plus-circle'}
+                    size={24}
+                    color={social.myEntry ? colors.gold : colors.text}
+                  />
+                </Pressable>
+                {/* Saving an album you have already ranked means nothing, so
+                    there is nothing to press. */}
+                {!social.myEntry && (
+                  <>
+                    <View style={styles.actionDivider} />
+                    <Pressable onPress={toggleBookmark} hitSlop={6} style={styles.action}>
+                      <Feather
+                        name="bookmark"
+                        size={22}
+                        color={social.saved ? colors.gold : colors.text}
+                      />
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            </Glass>
           </View>
 
-          <Glass style={styles.albumActions} cornerRadius={radius.pill} tone="regular">
-            <View style={styles.actionsRow}>
-              <Pressable onPress={() => setSheetOpen(true)} hitSlop={6} style={styles.action}>
-                <Feather
-                  name={social.myEntry ? 'check-circle' : 'plus-circle'}
-                  size={24}
-                  color={social.myEntry ? colors.gold : colors.text}
-                />
-              </Pressable>
-              <View style={styles.actionDivider} />
-              <Pressable onPress={toggleBookmark} hitSlop={6} style={styles.action}>
-                <Feather
-                  name="bookmark"
-                  size={22}
-                  color={social.saved ? colors.gold : colors.text}
-                />
-              </Pressable>
-            </View>
-          </Glass>
-        </View>
+          <GlobalText style={styles.title}>{album.name}</GlobalText>
+          <Pressable onPress={() => router.push(`/components/Artist/${album.artists[0].id}`)}>
+            <GlobalText style={styles.artists}>{artistNames}</GlobalText>
+          </Pressable>
 
-        <GlobalText style={styles.title}>{album.name}</GlobalText>
-        <Pressable onPress={() => router.push(`/components/Artist/${album.artists[0].id}`)}>
-          <GlobalText style={styles.artists}>{artistNames}</GlobalText>
-        </Pressable>
+          <View style={styles.metaRow}>
+            <GlobalText style={styles.meta}>{releaseYear}</GlobalText>
+            <GlobalText style={styles.metaDot}>∙</GlobalText>
+            <GlobalText style={styles.meta}>{minutes} min</GlobalText>
+            {social.average !== null && (
+              <>
+                <GlobalText style={styles.metaDot}>∙</GlobalText>
+                <GlobalText style={styles.score}>{social.average}</GlobalText>
+                <GlobalText style={styles.meta}>
+                  from {social.ratingCount} {social.ratingCount === 1 ? 'listener' : 'listeners'}
+                </GlobalText>
+              </>
+            )}
+          </View>
 
-        <View style={styles.metaRow}>
-          <GlobalText style={styles.meta}>{releaseYear}</GlobalText>
-          <GlobalText style={styles.metaDot}>∙</GlobalText>
-          <GlobalText style={styles.meta}>{minutes} min</GlobalText>
-          {social.average !== null && (
+          {social.myEntry && (
             <>
-              <GlobalText style={styles.metaDot}>∙</GlobalText>
-              <GlobalText style={styles.score}>{social.average}</GlobalText>
-              <GlobalText style={styles.meta}>
-                from {social.ratingCount} {social.ratingCount === 1 ? 'listener' : 'listeners'}
-              </GlobalText>
+              <SectionHeader>your ranking</SectionHeader>
+              {rankingRow(social.myEntry)}
             </>
           )}
-        </View>
 
-        {social.myEntry && (
-          <>
-            <SectionHeader>your ranking</SectionHeader>
-            {rankingRow(social.myEntry)}
-          </>
-        )}
+          <SectionHeader>friends' rankings</SectionHeader>
+          {social.friends.length > 0 ? (
+            social.friends.map(rankingRow)
+          ) : (
+            <Empty>nobody you follow has ranked this yet.</Empty>
+          )}
 
-        <SectionHeader>friends' rankings</SectionHeader>
-        {social.friends.length > 0 ? (
-          social.friends.map(rankingRow)
-        ) : (
-          <Empty>nobody you follow has ranked this yet.</Empty>
-        )}
-
-        {social.everyone.length > 0 && (
-          <>
-            <SectionHeader>everyone else</SectionHeader>
-            {social.everyone.map(rankingRow)}
+          {social.everyone.length > 0 && (
+            <>
+              <SectionHeader>everyone else</SectionHeader>
+              {social.everyone.map(rankingRow)}
+            </>
+          )}
           </>
         )}
       </Screen>
 
-      <RankSheet
-        visible={sheetOpen}
-        album={{
-          id: album.id,
-          name: album.name,
-          artistName: artistNames,
-          coverUrl: album.images[0]?.url ?? null,
-        }}
-        existing={social.myEntry}
-        accent={accent}
-        onClose={() => setSheetOpen(false)}
-        onSaved={loadSocial}
-        onDeleted={loadSocial}
-      />
+      {album && (
+        <RankSheet
+          visible={sheetOpen}
+          album={{
+            id: album.id,
+            name: album.name,
+            artistName: artistNames,
+            coverUrl: album.images[0]?.url ?? null,
+          }}
+          existing={social.myEntry}
+          accent={accent}
+          onClose={() => setSheetOpen(false)}
+          onSaved={loadSocial}
+          onDeleted={loadSocial}
+        />
+      )}
     </View>
   );
 }

@@ -24,12 +24,6 @@ export const colors = {
   glassStrong: '#FFFAF01A',
   /** Faint lift under a field or a row, without turning it into a card. */
   fill: '#FFFAF00A',
-  /**
-   * Laid over the blurred header bar. The page colour at part strength: the
-   * content still reads through it, blurred, but titles stay legible on top
-   * of whatever happens to be passing underneath.
-   */
-  bgVeil: '#0B0B0CA6',
   danger: '#E71022',
 } as const;
 

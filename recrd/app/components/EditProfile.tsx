@@ -15,7 +15,7 @@ import GlobalText from '@/lib/GlobalText';
 import Screen from '@/lib/Screen';
 import { Skeleton } from '@/lib/Skeleton';
 import UsernameField, { UsernameState } from '@/lib/UsernameField';
-import { apiJson, authFetch, errorMessage, useAuth } from '@/lib/session';
+import { apiJson, authUpload, useAuth } from '@/lib/session';
 import { colors, font, goldGlow, radius, spacing } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
 
@@ -80,17 +80,9 @@ export default function EditProfile() {
     // Show the local file straight away; the upload swaps in the hosted one.
     setAvatarUrl(asset.uri);
     try {
-      const body = new FormData();
-      body.append('file', {
-        uri: asset.uri,
-        name: asset.fileName || `avatar.${asset.uri.split('.').pop() || 'jpg'}`,
-        type: asset.mimeType || contentTypeFor(asset.uri),
-      } as any);
-
-      // Not apiJson: FormData has to set its own multipart boundary.
-      const resp = await authFetch('/users/me/avatar', { method: 'POST', body });
-      const data = await resp.json().catch(() => null);
-      if (!resp.ok) throw new Error(errorMessage(data, 'Upload failed'));
+      const data = await authUpload('/users/me/avatar', asset.uri, {
+        mimeType: asset.mimeType || contentTypeFor(asset.uri),
+      });
 
       setAvatarUrl(data.avatarUrl);
       await refreshMe();
@@ -154,7 +146,7 @@ export default function EditProfile() {
                   source={
                     avatarUrl.trim()
                       ? { uri: avatarUrl.trim() }
-                      : require('@/assets/images/placeholder_album.png')
+                      : require('@/assets/images/artist-placeholder.png')
                   }
                   style={styles.pfp}
                 />

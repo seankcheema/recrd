@@ -10,12 +10,13 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from spotipy import Spotify, SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import requests
 from io import BytesIO
 from colorthief import ColorThief
 from auth import router as auth_router
 from social import router as social_router
+from cache import TTLCache
 import charts
 
 load_dotenv()
@@ -56,13 +57,41 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(social_router)
 
+# An album, its artwork and the colour taken off that artwork are the same
+# every time anyone asks. The artist's own album list gains a record now and
+# then, and a search is worth holding just long enough that typing the same
+# thing twice does not cost two rounds of calls.
+_album_cache = TTLCache(24 * 60 * 60, max_entries=1000)
+_artist_cache = TTLCache(6 * 60 * 60, max_entries=500)
+_track_cache = TTLCache(24 * 60 * 60, max_entries=500)
+_search_cache = TTLCache(5 * 60, max_entries=300)
+
+
+def dominant_color(image_url: Optional[str]) -> str:
+    """The strongest colour in an image, as hex.
+
+    Means downloading the artwork and walking its pixels, which is the most
+    expensive thing either page does — hence the caches above.
+    """
+    if not image_url:
+        return "#000000"
+    try:
+        resp = requests.get(image_url, timeout=5)
+        resp.raise_for_status()
+        r, g, b = ColorThief(BytesIO(resp.content)).get_color(quality=1)
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except Exception:
+        # A colour is decoration; never fail a page over it.
+        return "#000000"
+
+
 @app.get("/songs/{song_id}")
 async def get_song(song_id: str):
     """
     Fetch a single track by Spotify ID.
     """
     try:
-        return sp.track(song_id)
+        return _track_cache.fetch(song_id, lambda: sp.track(song_id))
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Track not found: {e}")
 
@@ -76,56 +105,38 @@ def get_artist(artist_id: str):
       - images: List of image objects
       - albums: Deduplicated list of albums with id, name, images
     """
-    try:
+    def build() -> Dict[str, Any]:
         artist = sp.artist(artist_id)
+        albums_resp = sp.artist_albums(artist_id, include_groups="album", limit=50)
 
-        image_url = artist.get("images", [{}])[0].get("url")
-        if image_url:
-            # 3) download the image bytes
-            resp = requests.get(image_url, timeout=5)
-            resp.raise_for_status()
-            img_data = BytesIO(resp.content)
+        # Deduplicate albums by ID
+        seen = set()
+        deduped = []
+        for alb in albums_resp.get("items", []):
+            aid = alb.get("id")
 
-            # 4) extract the dominant color
-            ct = ColorThief(img_data)
-            r, g, b = ct.get_color(quality=1)
-            # 5) store it as a hex string
-            dominant_color = f"#{r:02x}{g:02x}{b:02x}"
-            # fallback if anything goes wrong
-        else:
-            dominant_color = "#000000"
+            if aid and aid not in seen:
+                seen.add(aid)
+                deduped.append({
+                    "id": aid,
+                    "name": alb.get("name"),
+                    "images": alb.get("images", []),
+                })
+
+        return {
+            "id": artist.get("id"),
+            "name": artist.get("name"),
+            "images": artist.get("images", []),
+            "albums": deduped,
+            "dominant_color": dominant_color(
+                artist.get("images", [{}])[0].get("url")
+            ),
+        }
+
+    try:
+        return _artist_cache.fetch(artist_id, build)
     except Exception:
         raise HTTPException(status_code=404, detail="Artist not found")
-
-    # Fetch artist's full albums
-    albums_resp = sp.artist_albums(
-        artist_id,
-        include_groups="album",
-        limit=50
-    )
-    items = albums_resp.get("items", [])
-
-    # Deduplicate albums by ID
-    seen = set()
-    deduped = []
-    for alb in items:
-        aid = alb.get("id")
-
-        if aid and aid not in seen:
-            seen.add(aid)
-            deduped.append({
-                "id": aid,
-                "name": alb.get("name"),
-                "images": alb.get("images", []),
-            })
-
-    return {
-        "id": artist.get("id"),
-        "name": artist.get("name"),
-        "images": artist.get("images", []),
-        "albums": deduped,
-        "dominant_color": dominant_color
-    }
 
 # ── genres ───────────────────────────────────────────────────────────────
 # Spotify's own genres are very fine-grained ("detroit trap", "alternative
@@ -134,18 +145,21 @@ def get_artist(artist_id: str):
 # several — "pop rap" is honestly both — and filtering is happier that way
 # than with a single forced choice.
 GENRE_BUCKETS: List[tuple] = [
+    # One bucket per kind of music: rap folds into hip-hop, soul into r&b and
+    # house into electronic, the same way the trending tiles group them. Two
+    # chips for the same music is just the same filter twice.
     ("hip-hop", ("hip hop", "hip-hop", "rap", "trap", "drill", "grime")),
-    ("r&b",     ("r&b", "rnb", "rhythm and blues")),
-    ("soul",    ("soul", "motown", "funk")),
+    ("r&b",     ("r&b", "rnb", "rhythm and blues", "soul", "motown", "funk")),
     ("pop",     ("pop",)),
     ("rock",    ("rock", "punk", "grunge", "britpop", "emo")),
     ("metal",   ("metal", "hardcore", "thrash", "doom")),
     ("indie",   ("indie", "alternative", "shoegaze", "lo-fi", "dream pop")),
     ("country", ("country", "americana", "bluegrass", "honky")),
     ("jazz",    ("jazz", "bebop", "bossa nova", "swing")),
-    ("house",   ("house", "techno", "edm", "electro", "dance", "garage", "dubstep")),
     ("folk",    ("folk", "singer-songwriter")),
-    ("electronic", ("electronic", "ambient", "idm", "synth", "downtempo")),
+    ("electronic", ("electronic", "ambient", "idm", "synth", "downtempo",
+                    "house", "techno", "edm", "electro", "dance", "garage",
+                    "dubstep")),
     ("latin",   ("latin", "reggaeton", "salsa", "bachata", "cumbia")),
     ("reggae",  ("reggae", "dancehall", "ska")),
     ("classical", ("classical", "orchestra", "baroque", "opera", "symphony")),
@@ -232,30 +246,16 @@ async def album_genres(
 
 @app.get("/albums/{album_id}")
 async def get_album(album_id: str):
-    # 1) fetch the raw album object from Spotify
-    album = sp.album(album_id)
-    
-    # 2) get the URL of the first image (highest resolution)
-    image_url = album.get("images", [{}])[0].get("url")
-    if image_url:
-        try:
-            # 3) download the image bytes
-            resp = requests.get(image_url, timeout=5)
-            resp.raise_for_status()
-            img_data = BytesIO(resp.content)
+    """An album with the dominant colour of its cover. Held for a day."""
 
-            # 4) extract the dominant color
-            ct = ColorThief(img_data)
-            r, g, b = ct.get_color(quality=1)
-            # 5) store it as a hex string
-            album["dominant_color"] = f"#{r:02x}{g:02x}{b:02x}"
-        except Exception:
-            # fallback if anything goes wrong
-            album["dominant_color"] = "#000000"
-    else:
-        album["dominant_color"] = "#000000"
+    def build() -> Dict[str, Any]:
+        album = sp.album(album_id)
+        album["dominant_color"] = dominant_color(
+            album.get("images", [{}])[0].get("url")
+        )
+        return album
 
-    return album
+    return _album_cache.fetch(album_id, build)
 
 @app.get("/trending_albums/", response_model=List[Dict[str, Any]])
 async def trending_albums(
@@ -291,6 +291,13 @@ async def search(
       - artists: top artist results, de-duplicated, sorted by popularity
       - combined: albums+artists merged (no duplicates) and sorted by popularity
     """
+    # People retype the same few searches, and each one here is two Spotify
+    # calls, so a recent answer stands.
+    key = (q.strip().lower(), limit)
+    hit = _search_cache.get(key)
+    if hit is not None:
+        return hit
+
     try:
         # 1) Run both searches
         alb_resp = sp.search(q=q, type="album",  limit=limit * 2)   # fetch more to allow for filtering
@@ -336,11 +343,13 @@ async def search(
             reverse=True
         )
 
-        return {
+        result = {
             "albums":   albums,
             "artists":  artists,
             "combined": combined
         }
+        _search_cache.set(key, result)
+        return result
 
     except SpotifyException as e:
         raise HTTPException(status_code=e.http_status or 400, detail=e.msg)

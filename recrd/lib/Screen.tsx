@@ -10,7 +10,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,22 +45,6 @@ interface ScreenProps {
   contentStyle?: StyleProp<ViewStyle>;
 }
 
-/**
- * How the blur lets go below the bar. Each band blurs and tints a little less
- * than the one above it, so content comes back into focus over a few pixels
- * rather than at a line. Over empty page background the bands are invisible —
- * the tint is the page colour — so at rest this reads as plain spacing.
- */
-const TAIL_BANDS = [
-  { intensity: 26, veil: '#0B0B0C73' },
-  { intensity: 15, veil: '#0B0B0C47' },
-  { intensity: 8, veil: '#0B0B0C24' },
-  { intensity: 3, veil: '#0B0B0C0D' },
-];
-const TAIL_BAND_HEIGHT = 4;
-/** What the tail covers, and so the gap a page leaves under the bar. */
-export const BAR_TAIL = TAIL_BANDS.length * TAIL_BAND_HEIGHT;
-
 export default function Screen({
   children,
   title,
@@ -79,21 +62,21 @@ export default function Screen({
   const insets = useSafeAreaInsets();
   // The bar floats over the content, so the scroll view has to be told how
   // much of its top is spoken for.
-  const [barHeight, setBarHeight] = useState(0);
-  // Content clears the bar and the blur tail under it. The tail is the gap:
-  // it is empty page background until something scrolls into it.
-  const topInset = barHeight + BAR_TAIL;
+  // How much of the top the bar covers, measured rather than assumed.
+  const [topInset, setTopInset] = useState(0);
+
+  // The strip the status bar sits in, solid like the title under it.
+  const topStrip = <View style={{ height: Math.max(insets.top, spacing.xl) + spacing.sm }} />;
 
   const header = (title || titlePlaceholder || showBack || headerRight) && (
     <View
       style={[
         styles.header,
-        {
-          paddingTop: Math.max(insets.top, spacing.xl) + spacing.sm,
-          // A field below needs a gap above it; with nothing there, the tail
-          // already holds the content off.
-          paddingBottom: belowHeader ? spacing.md : spacing.xs,
-        },
+        // Where a search field follows, the solid part stops just under the
+        // title and the rest of the gap belongs to the field, so the page
+        // reappears above it rather than out from under its edge. With no
+        // field, this is simply the gap before the content.
+        { paddingBottom: belowHeader ? spacing.xs : spacing.md },
       ]}
     >
       {showBack && (
@@ -123,6 +106,14 @@ export default function Screen({
       </View>
       {headerRight}
     </View>
+  );
+
+  // Only the header takes the tap-to-dismiss; the body below keeps its own
+  // gestures.
+  const headerBlock = (
+    <Pressable onPress={Keyboard.dismiss} accessible={false}>
+      {header}
+    </Pressable>
   );
 
   const body = scroll ? (
@@ -177,60 +168,52 @@ export default function Screen({
       {/* The body goes down first so the bar's blur has something to work on. */}
       {body}
       {header || belowHeader ? (
-        <FloatingBar onHeightChange={setBarHeight}>
-          {/* Only the header takes the tap-to-dismiss; the body below keeps
-              its own gestures. */}
-          <Pressable onPress={Keyboard.dismiss} accessible={false}>
-            {header}
-          </Pressable>
-          {belowHeader ? <View style={styles.belowHeader}>{belowHeader}</View> : null}
-        </FloatingBar>
+        <FloatingBar
+          onInsetChange={setTopInset}
+          solid={
+            <>
+              {topStrip}
+              {headerBlock}
+            </>
+          }
+          floating={
+            belowHeader ? <View style={styles.belowHeader}>{belowHeader}</View> : null
+          }
+        />
       ) : null}
     </View>
   );
 }
 
 /**
- * A bar pinned to the top of a page, with the page's own content passing
- * underneath it. The content stays visible through the blur rather than
- * scrolling into a solid block of background.
+ * A bar pinned to the top of a page. The page runs up behind it and stops at
+ * its solid part; anything floating below that sits over the page itself.
  */
 export function FloatingBar({
-  children,
-  onHeightChange,
+  solid,
+  floating,
+  onInsetChange,
 }: {
-  children: React.ReactNode;
-  onHeightChange?: (height: number) => void;
+  /**
+   * Sits on page background. This is the cut: whatever scrolls up behind it
+   * simply ends here.
+   */
+  solid?: React.ReactNode;
+  /** Sits below the cut, over the page — a search field, say. */
+  floating?: React.ReactNode;
+  /** What the bar covers, for the page to inset its content by. */
+  onInsetChange?: (inset: number) => void;
 }) {
-  const [height, setHeight] = useState(0);
-
   return (
-    <>
-      {/* Touches stop at the bar rather than reaching the content showing
-          through it, the way a nav bar behaves anywhere else. */}
-      <View
-        style={styles.bar}
-        onLayout={(e) => {
-          const next = e.nativeEvent.layout.height;
-          if (next === height) return;
-          setHeight(next);
-          onHeightChange?.(next);
-        }}
-      >
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, styles.barVeil]} pointerEvents="none" />
-        {children}
-      </View>
-
-      <View style={[styles.barTail, { top: height }]} pointerEvents="none">
-        {TAIL_BANDS.map((band) => (
-          <View key={band.veil} style={styles.tailBand}>
-            <BlurView intensity={band.intensity} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: band.veil }]} />
-          </View>
-        ))}
-      </View>
-    </>
+    // Touches stop at the bar rather than reaching the page behind it, the
+    // way a nav bar behaves anywhere else.
+    <View
+      style={styles.bar}
+      onLayout={(e) => onInsetChange?.(e.nativeEvent.layout.height)}
+    >
+      <View style={styles.barSolid}>{solid}</View>
+      {floating}
+    </View>
   );
 }
 
@@ -271,20 +254,16 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 2,
   },
-  barVeil: {
-    backgroundColor: colors.bgVeil,
-  },
-  barTail: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  tailBand: {
-    height: TAIL_BAND_HEIGHT,
+  barSolid: {
+    backgroundColor: colors.bg,
   },
   belowHeader: {
     paddingHorizontal: spacing.xl,
+    // Together with the header's 4 above it, the field keeps the same 12 it
+    // has always had between itself and the title — the cut just sits higher
+    // in that gap now.
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   header: {
     flexDirection: 'row',

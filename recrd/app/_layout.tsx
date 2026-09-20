@@ -1,9 +1,17 @@
 // app/_layout.tsx
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
+import {
+  DarkTheme,
+  Stack,
+  ThemeProvider,
+  useRouter,
+  useSegments,
+  usePathname,
+} from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import Nav from '@/lib/Nav';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +20,22 @@ import { colors } from '@/lib/theme';
 
 // Keep splash visible until we manually hide it
 SplashScreen.preventAutoHideAsync();
+
+// The window behind the navigator, which is white until told otherwise. It
+// shows during a swipe-back, in the strip the outgoing screen has left and
+// the one underneath has not covered yet. app.json sets this for a build, but
+// that is native config and does nothing in Expo Go.
+SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {
+  // Nothing to do about it; the flash is cosmetic.
+});
+
+// React Navigation paints the space around a screen mid-transition from its
+// theme, not from any screen's own style — and its default theme is a light
+// one. That is the white edge that shows while a page slides away.
+const navigationTheme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg },
+};
 
 const AUTH_ROUTES = [
   '/components/Login',
@@ -155,9 +179,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
+      <ThemeProvider value={navigationTheme}>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -165,6 +191,9 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // Anything the navigator is not covering at that moment is page colour,
+    // not white.
+    backgroundColor: colors.bg,
   },
   splash: {
     flex: 1,

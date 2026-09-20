@@ -8,6 +8,7 @@ import SearchField from '@/lib/SearchField';
 import { SkeletonFeed, SkeletonList } from '@/lib/Skeleton';
 import { Glass, GlassButton } from '@/lib/Glass';
 import { apiJson } from '@/lib/session';
+import { peekCached, storeCached } from '@/lib/cache';
 import { API_URL } from '@/lib/api';
 import { colors, font, radius, spacing } from '@/lib/theme';
 import type { Entry, PersonRow } from '@/lib/types';
@@ -19,11 +20,16 @@ interface SpotifyHit {
   artists?: { name: string }[];
 }
 
+const FEED_KEY = 'feed';
+
 export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [feed, setFeed] = useState<Entry[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The feed you were last shown, so coming back to the tab picks up where
+  // it left off instead of going blank while it reloads behind you.
+  const heldFeed = peekCached<Entry[]>(FEED_KEY);
+  const [feed, setFeed] = useState<Entry[]>(heldFeed ?? []);
+  const [loading, setLoading] = useState(heldFeed === null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +40,9 @@ export default function Home() {
 
   const loadFeed = useCallback(async () => {
     try {
-      setFeed(await apiJson<Entry[]>('/feed'));
+      const rows = await apiJson<Entry[]>('/feed');
+      setFeed(rows);
+      storeCached(FEED_KEY, rows);
       setError(null);
     } catch (e: any) {
       setError(e.message);
@@ -133,7 +141,7 @@ export default function Home() {
                       source={
                         person.avatarUrl
                           ? { uri: person.avatarUrl }
-                          : require('@/assets/images/placeholder_album.png')
+                          : require('@/assets/images/artist-placeholder.png')
                       }
                       style={styles.pfp}
                     />
@@ -213,11 +221,13 @@ export default function Home() {
         </View>
       ) : (
         <>
-          <SectionHeader first>activity</SectionHeader>
+          <SectionHeader first style={styles.activityHeader}>
+            activity
+          </SectionHeader>
 
           {loading ? (
             <SkeletonFeed count={3} />
-          ) : error ? (
+          ) : error && feed.length === 0 ? (
             <Empty>{error}</Empty>
           ) : feed.length === 0 ? (
             <Glass style={styles.emptyCard} cornerRadius={radius.lg} tone="clear">
@@ -253,6 +263,13 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  activityHeader: {
+    // A post carries its own top padding, which the album grid and the saved
+    // rows below their headings do not. Trimming the heading's gap by that
+    // much leaves the same distance under "activity" as under every other
+    // title on the page.
+    marginBottom: spacing.md - spacing.lg,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

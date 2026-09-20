@@ -46,6 +46,18 @@ AVATAR_TYPES = {
     "image/png": "png",
     "image/webp": "webp",
     "image/heic": "heic",
+    "image/heif": "heic",
+}
+# A picker can hand over a type we do not recognise, or none at all, for a file
+# that is perfectly fine — iOS in particular is inconsistent about HEIC. The
+# file name still says what it is, so fall back to that before refusing.
+AVATAR_EXTENSIONS = {
+    "jpg": ("jpg", "image/jpeg"),
+    "jpeg": ("jpg", "image/jpeg"),
+    "png": ("png", "image/png"),
+    "webp": ("webp", "image/webp"),
+    "heic": ("heic", "image/heic"),
+    "heif": ("heic", "image/heic"),
 }
 
 
@@ -274,20 +286,44 @@ def update_my_profile(data: ProfileUpdate, user_id: str = Depends(current_user_i
     return {**shape_profile(require_profile(user_id)), **profile_stats(user_id, user_id)}
 
 
+def _avatar_kind(file: UploadFile) -> tuple[str, str]:
+    """The extension to store an upload under, and the type to store it as."""
+    content_type = (file.content_type or "").lower().split(";")[0].strip()
+    extension = AVATAR_TYPES.get(content_type)
+    if extension:
+        return extension, content_type
+
+    suffix = (file.filename or "").rsplit(".", 1)[-1].lower()
+    known = AVATAR_EXTENSIONS.get(suffix)
+    if known:
+        return known
+
+    raise HTTPException(status_code=400, detail="Pick a JPEG, PNG, WebP or HEIC image.")
+
+
 def _ensure_avatar_bucket() -> None:
     """Create the avatars bucket once, the first time anyone uploads."""
     try:
         supabase_admin.storage.get_bucket(AVATAR_BUCKET)
+        return
     except Exception:
+        pass
+
+    try:
+        supabase_admin.storage.create_bucket(
+            AVATAR_BUCKET,
+            options={"public": True, "file_size_limit": AVATAR_MAX_BYTES},
+        )
+    except Exception as e:
+        # A parallel request may have created it in the meantime. Anything
+        # else and the upload would fail as a bare "bucket not found", which
+        # says nothing about why, so say it here instead.
         try:
-            supabase_admin.storage.create_bucket(
-                AVATAR_BUCKET,
-                options={"public": True, "file_size_limit": AVATAR_MAX_BYTES},
-            )
+            supabase_admin.storage.get_bucket(AVATAR_BUCKET)
         except Exception:
-            # A parallel request may have just created it; the upload below
-            # will surface the problem if it really is missing.
-            pass
+            raise HTTPException(
+                status_code=502, detail=f"Could not prepare avatar storage: {e}"
+            )
 
 
 @router.post("/users/me/avatar")
@@ -295,12 +331,7 @@ async def upload_avatar(
     file: UploadFile = File(...), user_id: str = Depends(current_user_id)
 ):
     """Upload a profile picture and point the profile at it."""
-    content_type = (file.content_type or "").lower()
-    extension = AVATAR_TYPES.get(content_type)
-    if not extension:
-        raise HTTPException(
-            status_code=400, detail="Pick a JPEG, PNG, WebP or HEIC image."
-        )
+    extension, content_type = _avatar_kind(file)
 
     body = await file.read()
     if not body:
@@ -316,7 +347,8 @@ async def upload_avatar(
         supabase_admin.storage.from_(AVATAR_BUCKET).upload(
             path, body, {"content-type": content_type, "upsert": "true"}
         )
-        url = supabase_admin.storage.from_(AVATAR_BUCKET).get_public_url(path)
+        # storage3 hands back the url with a bare "?" on the end.
+        url = supabase_admin.storage.from_(AVATAR_BUCKET).get_public_url(path).rstrip("?")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upload failed: {e}")
 
@@ -439,7 +471,7 @@ def get_user_watchlist(
         .limit(limit)
         .execute()
     )
-    return [shape_saved(r) for r in (res.data or [])]
+    return [shape_saved(r) for r in without_ranked(profile_id, res.data or [])]
 
 
 # ── entries ──────────────────────────────────────────────────────────────
@@ -640,6 +672,33 @@ def shape_saved(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def ranked_album_ids(owner_id: str, album_ids: Optional[List[str]] = None) -> set:
+    """Which of these albums the owner has already ranked."""
+    if album_ids is not None and not album_ids:
+        return set()
+    query = (
+        supabase_admin.table("album_entries")
+        .select("spotify_album_id")
+        .eq("user_id", owner_id)
+    )
+    if album_ids is not None:
+        query = query.in_("spotify_album_id", album_ids)
+    res = query.execute()
+    return {r["spotify_album_id"] for r in (res.data or [])}
+
+
+def without_ranked(owner_id: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Saved rows, minus anything its owner has since ranked.
+
+    Ranking takes an album off the list, but rows saved before that rule — or
+    by an older build — can still be sitting there, and a record you have
+    already ranked is not something you mean to listen to.
+    """
+    ids = [r["spotify_album_id"] for r in rows]
+    ranked = ranked_album_ids(owner_id, ids)
+    return [r for r in rows if r["spotify_album_id"] not in ranked]
+
+
 @router.get("/watchlist")
 def get_watchlist(user_id: str = Depends(current_user_id)):
     res = (
@@ -649,11 +708,18 @@ def get_watchlist(user_id: str = Depends(current_user_id)):
         .order("created_at", desc=True)
         .execute()
     )
-    return [shape_saved(r) for r in (res.data or [])]
+    return [shape_saved(r) for r in without_ranked(user_id, res.data or [])]
 
 
 @router.post("/watchlist", status_code=201)
 def add_to_watchlist(data: SaveInput, user_id: str = Depends(current_user_id)):
+    # An album you have ranked is one you have heard, so it has no business
+    # on a list of albums to get to.
+    if ranked_album_ids(user_id, [data.spotifyAlbumId]):
+        raise HTTPException(
+            status_code=409, detail="You've already ranked this album."
+        )
+
     supabase_admin.table("saved_albums").upsert(
         {
             "user_id": user_id,
